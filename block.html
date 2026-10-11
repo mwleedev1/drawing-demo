@@ -43,6 +43,15 @@ button[aria-pressed="true"] { background: var(--fg); color: #14171d; border-colo
   #intro ol, #intro .note { display: none; }
   #paint { left: 16px; right: 16px; width: auto; top: auto; bottom: 0; max-height: 80%; border-radius: 16px 16px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
 }
+#paint { z-index: 20; }
+#toast { z-index: 30; }
+@media (max-width: 640px) {
+  body.painting #dock { display: none; }
+  #paint { max-height: 88%; }
+  body.painting #intro { display: none; }
+  #paint footer { position: sticky; bottom: 0; background: var(--panel-solid); padding-top: 8px; margin-top: -2px; }
+  #paint footer button { min-height: 46px; }
+}
 </style>
 
 <canvas id="gl" aria-label="블록 동물이 걸어 다니는 3D 농장"></canvas>
@@ -357,6 +366,7 @@ button[aria-pressed="true"] { background: var(--fg); color: #14171d; border-colo
   $("kinds").addEventListener("click", (e) => { const b = e.target.closest("button[data-k]"); if (b) pick(b.dataset.k); });
   $("tools").addEventListener("click", (e) => { const b = e.target.closest("button[data-t]"); if (!b) return; tool = b.dataset.t; document.querySelectorAll("#tools button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); });
   const paint = $("paint");
+  new MutationObserver(() => document.body.classList.toggle("painting", !paint.hidden)).observe(paint, { attributes: true, attributeFilter: ["hidden"] });
   $("openPaint").addEventListener("click", () => { paint.hidden = !paint.hidden; if (!paint.hidden && !isLine) pick(kind); });
   $("paintClose").addEventListener("click", () => (paint.hidden = true));
   $("paintReset").addEventListener("click", () => { lctx.clearRect(0, 0, AW, AH); redraw(); });

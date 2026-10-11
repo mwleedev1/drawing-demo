@@ -51,6 +51,16 @@ button[aria-pressed="true"] { background: var(--fg); color: #14171d; border-colo
   #intro ol, #intro .note { display: none; }
   #paint { left: 16px; right: 16px; width: auto; top: auto; bottom: 0; max-height: 78%; border-radius: 16px 16px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
 }
+#paint { z-index: 20; }
+#toast { z-index: 30; }
+@media (max-width: 640px) {
+  body.painting #dock { display: none; }
+  #paint { max-height: 88%; gap: 8px; }
+  #pc { width: min(100%, 30vh); }
+  body.painting #intro { display: none; }
+  #paint footer { position: sticky; bottom: 0; background: var(--panel-solid); padding-top: 8px; margin-top: -2px; }
+  #paint footer button { min-height: 46px; }
+}
 </style>
 
 <canvas id="gl" aria-label="그림 캐릭터가 걸어 다니는 3D 농장"></canvas>
@@ -569,6 +579,7 @@ button[aria-pressed="true"] { background: var(--fg); color: #14171d; border-colo
   ORDER.forEach((n) => { const b = document.createElement("button"); b.type = "button"; b.className = "thumb"; b.dataset.n = n; b.title = ART.NAMES[n]; b.setAttribute("aria-label", ART.NAMES[n] + " 도안"); b.setAttribute("aria-pressed", "false"); const im = document.createElement("img"); im.alt = ""; im.src = svgUrl(n, false); b.appendChild(im); b.addEventListener("click", () => pick(n)); thumbs.appendChild(b); });
   PALETTE.forEach((p, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "swatch"; b.style.background = p; b.setAttribute("aria-label", "색 " + (i + 1)); b.setAttribute("aria-pressed", String(i === 0)); b.addEventListener("click", () => { color = p; sw.querySelectorAll(".swatch").forEach((s) => s.setAttribute("aria-pressed", String(s === b))); }); sw.appendChild(b); });
   const paint = $("paint");
+  new MutationObserver(() => document.body.classList.toggle("painting", !paint.hidden)).observe(paint, { attributes: true, attributeFilter: ["hidden"] });
   $("openPaint").addEventListener("click", () => { paint.hidden = !paint.hidden; if (!paint.hidden && !lineImg) pick(current); });
   $("paintClose").addEventListener("click", () => (paint.hidden = true));
   $("paintReset").addEventListener("click", () => { lctx.clearRect(0, 0, 512, 512); drawPaint(); });
