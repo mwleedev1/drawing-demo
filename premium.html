@@ -1,0 +1,1826 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}</style></head><body><title>그림 농장 프리미엄</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<style>
+/* 화면 전체가 3D 무대. 빔 여러 대 모드에서는 무대가 가운데 띠로 줄고 바깥은 검게 둔다. */
+:root {
+  color-scheme: dark;
+  --bg: #07090d; --panel: rgba(14, 17, 24, 0.78); --panel-solid: #141923; --line: rgba(255, 255, 255, 0.15);
+  --fg: #f4f0e8; --muted: #bdb6a8; --accent: #f2c14e; --accent-ink: #1c1606; --danger: #ffb4a2;
+  --font: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+}
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font); font-size: 14px; overflow: hidden; }
+#gl { position: fixed; left: 0; top: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+#guides { position: fixed; pointer-events: none; display: none; }
+#guides .v, #guides .h { position: absolute; border: 0 dashed rgba(255, 255, 255, 0.7); }
+#guides .v { top: 0; bottom: 0; border-left-width: 2px; }
+#guides .h { left: 0; right: 0; border-top-width: 2px; }
+#guides .lab { position: absolute; font-size: 12px; font-weight: 700; color: #fff; background: rgba(0, 0, 0, 0.45); border-radius: 6px; padding: 2px 7px; margin: 6px; }
+button, label.btn { font: inherit; color: var(--fg); background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+button:hover, label.btn:hover { background: rgba(255, 255, 255, 0.14); }
+button:focus-visible, label.btn:focus-within, .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary, label.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 700; }
+button.primary:hover, label.btn.primary:hover { background: #ffd369; }
+button[aria-pressed="true"] { background: var(--fg); color: #14171d; border-color: transparent; font-weight: 700; }
+#intro { box-sizing: border-box; position: fixed; left: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); max-width: min(360px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; backdrop-filter: blur(8px); z-index: 5; }
+#intro h1 { font-size: 18px; margin: 0 0 4px; font-weight: 700; }
+#intro p { margin: 0; color: var(--muted); line-height: 1.55; }
+#intro .note { margin-top: 10px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 8px; line-height: 1.5; }
+#dock { box-sizing: border-box; position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: center; align-items: center; background: linear-gradient(to top, rgba(6, 8, 12, 0.88), rgba(6, 8, 12, 0)); z-index: 6; }
+.group { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: center; }
+.group > span { color: var(--muted); font-size: 12px; margin-right: 2px; }
+#more { display: none; }
+#file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+#toast { box-sizing: border-box; position: fixed; left: 50%; top: calc(18px + env(safe-area-inset-top, 0px)); transform: translateX(-50%); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; max-width: calc(100% - 32px); text-align: center; z-index: 30; }
+#toast.err { color: var(--danger); }
+#paint { box-sizing: border-box; position: fixed; right: 16px; top: calc(16px + env(safe-area-inset-top, 0px)); width: min(520px, calc(100% - 32px)); max-height: calc(100% - 120px); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow: auto; z-index: 20; }
+#paint header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+#paint h2 { font-size: 16px; margin: 0; }
+#pc { width: 100%; max-width: 100%; aspect-ratio: 1024 / 640; background: #fff; border-radius: 10px; touch-action: none; cursor: crosshair; display: block; }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.row > span { color: var(--muted); font-size: 12px; }
+.swatch { width: 26px; height: 26px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); padding: 0; cursor: pointer; }
+.swatch[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 2px var(--accent); }
+#paint footer { display: flex; gap: 8px; flex-wrap: wrap; }
+#paint footer button { flex: 1; justify-content: center; }
+body.kiosk #intro, body.kiosk #dock, body.kiosk #toast { display: none !important; }
+body.wall #intro { display: none; }
+@media (max-width: 760px) {
+  #intro .note { display: none; }
+  #intro p { font-size: 13px; }
+  #moreToggle { display: inline-flex; }
+  #more { display: none; width: 100%; flex-direction: column; gap: 8px; }
+  body.more-open #more { display: flex; }
+  body.more-open #dock { background: rgba(6, 8, 12, 0.9); }
+  #paint { left: 16px; right: 16px; width: auto; top: auto; bottom: 0; max-height: 88%; border-radius: 16px 16px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)); }
+  body.painting #dock, body.painting #intro { display: none; }
+  #paint footer { position: sticky; bottom: 0; background: var(--panel-solid); padding-top: 8px; }
+  #paint footer button { min-height: 46px; }
+}
+@media (min-width: 761px) {
+  #moreToggle { display: none; }
+  #more { display: contents; }
+}
+</style>
+
+<canvas id="gl" aria-label="색칠한 동물들이 지내는 3D 농장"></canvas>
+<div id="guides" aria-hidden="true"></div>
+
+<section id="intro">
+  <h1>그림 농장 3D</h1>
+  <p>색칠한 동물이 빛과 함께 농장에 내려와 지냅니다. 동물을 눌러 고른 뒤 아래 동작 버튼을 눌러 보세요.</p>
+  <div class="note">화면 구성에서 빔프로젝터 4대를 이어 붙인 화면을 미리 볼 수 있습니다. 동물은 이어진 화면 안에서만 움직입니다.</div>
+</section>
+
+<div id="toast" role="status" hidden></div>
+
+<section id="paint" hidden aria-label="화면에서 색칠하기">
+  <header><h2>화면에서 색칠하기</h2><button id="paintClose" type="button">닫기</button></header>
+  <div class="row" id="kinds"><span>도안</span>
+    <button type="button" data-k="cow" aria-pressed="true">소</button>
+    <button type="button" data-k="pig" aria-pressed="false">돼지</button>
+    <button type="button" data-k="dog" aria-pressed="false">강아지</button>
+  </div>
+  <canvas id="pc" width="1024" height="640"></canvas>
+  <div class="row" id="tools"><span>도구</span>
+    <button type="button" data-t="fill" aria-pressed="true">부위 채우기</button>
+    <button type="button" data-t="brush" aria-pressed="false">붓으로 그리기</button>
+  </div>
+  <div class="row" id="swatches"></div>
+  <footer><button id="paintReset" type="button">다시 칠하기</button><button id="paintSend" type="button" class="primary">화면으로 보내기</button></footer>
+</section>
+
+<div id="dock">
+  <div class="group">
+    <label class="btn primary" for="file">도안 사진 올리기<input id="file" type="file" accept="image/*"></label>
+    <button id="openPaint" type="button">화면에서 색칠하기</button>
+    <button id="moreToggle" type="button" aria-expanded="false">동작·배경</button>
+  </div>
+  <div id="more">
+    <div class="group" id="actions"><span id="actLabel">동작 (모두)</span></div>
+    <div class="group" id="seasons"><span>계절</span>
+      <button type="button" data-s="spring" aria-pressed="true">봄</button>
+      <button type="button" data-s="summer" aria-pressed="false">여름</button>
+      <button type="button" data-s="autumn" aria-pressed="false">가을</button>
+      <button type="button" data-s="winter" aria-pressed="false">겨울</button>
+    </div>
+    <div class="group" id="times"><span>시간</span>
+      <button type="button" data-t="day" aria-pressed="false">낮</button>
+      <button type="button" data-t="sunset" aria-pressed="true">노을</button>
+      <button type="button" data-t="night" aria-pressed="false">밤</button>
+    </div>
+    <div class="group" id="modes"><span>화면 구성</span>
+      <button type="button" data-m="single" aria-pressed="true">화면 1개</button>
+      <button type="button" data-m="wall4" aria-pressed="false">빔 4대 가로</button>
+      <button type="button" data-m="grid4" aria-pressed="false">빔 4대 2×2</button>
+      <button id="fs" type="button">전체 화면</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+( function () {
+
+	/**
+ * Full-screen textured quad shader
+ */
+	var CopyShader = {
+		uniforms: {
+			'tDiffuse': {
+				value: null
+			},
+			'opacity': {
+				value: 1.0
+			}
+		},
+		vertexShader:
+  /* glsl */
+  `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader:
+  /* glsl */
+  `
+
+		uniform float opacity;
+
+		uniform sampler2D tDiffuse;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec4 texel = texture2D( tDiffuse, vUv );
+			gl_FragColor = opacity * texel;
+
+		}`
+	};
+
+	THREE.CopyShader = CopyShader;
+
+} )();
+
+( function () {
+
+	/**
+ * Luminosity
+ * http://en.wikipedia.org/wiki/Luminosity
+ */
+
+	const LuminosityHighPassShader = {
+		shaderID: 'luminosityHighPass',
+		uniforms: {
+			'tDiffuse': {
+				value: null
+			},
+			'luminosityThreshold': {
+				value: 1.0
+			},
+			'smoothWidth': {
+				value: 1.0
+			},
+			'defaultColor': {
+				value: new THREE.Color( 0x000000 )
+			},
+			'defaultOpacity': {
+				value: 0.0
+			}
+		},
+		vertexShader:
+  /* glsl */
+  `
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vUv = uv;
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+
+		}`,
+		fragmentShader:
+  /* glsl */
+  `
+
+		uniform sampler2D tDiffuse;
+		uniform vec3 defaultColor;
+		uniform float defaultOpacity;
+		uniform float luminosityThreshold;
+		uniform float smoothWidth;
+
+		varying vec2 vUv;
+
+		void main() {
+
+			vec4 texel = texture2D( tDiffuse, vUv );
+
+			vec3 luma = vec3( 0.299, 0.587, 0.114 );
+
+			float v = dot( texel.xyz, luma );
+
+			vec4 outputColor = vec4( defaultColor.rgb, defaultOpacity );
+
+			float alpha = smoothstep( luminosityThreshold, luminosityThreshold + smoothWidth, v );
+
+			gl_FragColor = mix( outputColor, texel, alpha );
+
+		}`
+	};
+
+	THREE.LuminosityHighPassShader = LuminosityHighPassShader;
+
+} )();
+
+( function () {
+
+	class EffectComposer {
+
+		constructor( renderer, renderTarget ) {
+
+			this.renderer = renderer;
+
+			if ( renderTarget === undefined ) {
+
+				const parameters = {
+					minFilter: THREE.LinearFilter,
+					magFilter: THREE.LinearFilter,
+					format: THREE.RGBAFormat
+				};
+				const size = renderer.getSize( new THREE.Vector2() );
+				this._pixelRatio = renderer.getPixelRatio();
+				this._width = size.width;
+				this._height = size.height;
+				renderTarget = new THREE.WebGLRenderTarget( this._width * this._pixelRatio, this._height * this._pixelRatio, parameters );
+				renderTarget.texture.name = 'EffectComposer.rt1';
+
+			} else {
+
+				this._pixelRatio = 1;
+				this._width = renderTarget.width;
+				this._height = renderTarget.height;
+
+			}
+
+			this.renderTarget1 = renderTarget;
+			this.renderTarget2 = renderTarget.clone();
+			this.renderTarget2.texture.name = 'EffectComposer.rt2';
+			this.writeBuffer = this.renderTarget1;
+			this.readBuffer = this.renderTarget2;
+			this.renderToScreen = true;
+			this.passes = []; // dependencies
+
+			if ( THREE.CopyShader === undefined ) {
+
+				console.error( 'THREE.EffectComposer relies on THREE.CopyShader' );
+
+			}
+
+			if ( THREE.ShaderPass === undefined ) {
+
+				console.error( 'THREE.EffectComposer relies on THREE.ShaderPass' );
+
+			}
+
+			this.copyPass = new THREE.ShaderPass( THREE.CopyShader );
+			this.clock = new THREE.Clock();
+
+		}
+
+		swapBuffers() {
+
+			const tmp = this.readBuffer;
+			this.readBuffer = this.writeBuffer;
+			this.writeBuffer = tmp;
+
+		}
+
+		addPass( pass ) {
+
+			this.passes.push( pass );
+			pass.setSize( this._width * this._pixelRatio, this._height * this._pixelRatio );
+
+		}
+
+		insertPass( pass, index ) {
+
+			this.passes.splice( index, 0, pass );
+			pass.setSize( this._width * this._pixelRatio, this._height * this._pixelRatio );
+
+		}
+
+		removePass( pass ) {
+
+			const index = this.passes.indexOf( pass );
+
+			if ( index !== - 1 ) {
+
+				this.passes.splice( index, 1 );
+
+			}
+
+		}
+
+		isLastEnabledPass( passIndex ) {
+
+			for ( let i = passIndex + 1; i < this.passes.length; i ++ ) {
+
+				if ( this.passes[ i ].enabled ) {
+
+					return false;
+
+				}
+
+			}
+
+			return true;
+
+		}
+
+		render( deltaTime ) {
+
+			// deltaTime value is in seconds
+			if ( deltaTime === undefined ) {
+
+				deltaTime = this.clock.getDelta();
+
+			}
+
+			const currentRenderTarget = this.renderer.getRenderTarget();
+			let maskActive = false;
+
+			for ( let i = 0, il = this.passes.length; i < il; i ++ ) {
+
+				const pass = this.passes[ i ];
+				if ( pass.enabled === false ) continue;
+				pass.renderToScreen = this.renderToScreen && this.isLastEnabledPass( i );
+				pass.render( this.renderer, this.writeBuffer, this.readBuffer, deltaTime, maskActive );
+
+				if ( pass.needsSwap ) {
+
+					if ( maskActive ) {
+
+						const context = this.renderer.getContext();
+						const stencil = this.renderer.state.buffers.stencil; //context.stencilFunc( context.NOTEQUAL, 1, 0xffffffff );
+
+						stencil.setFunc( context.NOTEQUAL, 1, 0xffffffff );
+						this.copyPass.render( this.renderer, this.writeBuffer, this.readBuffer, deltaTime ); //context.stencilFunc( context.EQUAL, 1, 0xffffffff );
+
+						stencil.setFunc( context.EQUAL, 1, 0xffffffff );
+
+					}
+
+					this.swapBuffers();
+
+				}
+
+				if ( THREE.MaskPass !== undefined ) {
+
+					if ( pass instanceof THREE.MaskPass ) {
+
+						maskActive = true;
+
+					} else if ( pass instanceof THREE.ClearMaskPass ) {
+
+						maskActive = false;
+
+					}
+
+				}
+
+			}
+
+			this.renderer.setRenderTarget( currentRenderTarget );
+
+		}
+
+		reset( renderTarget ) {
+
+			if ( renderTarget === undefined ) {
+
+				const size = this.renderer.getSize( new THREE.Vector2() );
+				this._pixelRatio = this.renderer.getPixelRatio();
+				this._width = size.width;
+				this._height = size.height;
+				renderTarget = this.renderTarget1.clone();
+				renderTarget.setSize( this._width * this._pixelRatio, this._height * this._pixelRatio );
+
+			}
+
+			this.renderTarget1.dispose();
+			this.renderTarget2.dispose();
+			this.renderTarget1 = renderTarget;
+			this.renderTarget2 = renderTarget.clone();
+			this.writeBuffer = this.renderTarget1;
+			this.readBuffer = this.renderTarget2;
+
+		}
+
+		setSize( width, height ) {
+
+			this._width = width;
+			this._height = height;
+			const effectiveWidth = this._width * this._pixelRatio;
+			const effectiveHeight = this._height * this._pixelRatio;
+			this.renderTarget1.setSize( effectiveWidth, effectiveHeight );
+			this.renderTarget2.setSize( effectiveWidth, effectiveHeight );
+
+			for ( let i = 0; i < this.passes.length; i ++ ) {
+
+				this.passes[ i ].setSize( effectiveWidth, effectiveHeight );
+
+			}
+
+		}
+
+		setPixelRatio( pixelRatio ) {
+
+			this._pixelRatio = pixelRatio;
+			this.setSize( this._width, this._height );
+
+		}
+
+	}
+
+	class Pass {
+
+		constructor() {
+
+			// if set to true, the pass is processed by the composer
+			this.enabled = true; // if set to true, the pass indicates to swap read and write buffer after rendering
+
+			this.needsSwap = true; // if set to true, the pass clears its buffer before rendering
+
+			this.clear = false; // if set to true, the result of the pass is rendered to screen. This is set automatically by EffectComposer.
+
+			this.renderToScreen = false;
+
+		}
+
+		setSize( ) {}
+
+		render( ) {
+
+			console.error( 'THREE.Pass: .render() must be implemented in derived pass.' );
+
+		}
+
+	} // Helper for passes that need to fill the viewport with a single quad.
+
+
+	const _camera = new THREE.OrthographicCamera( - 1, 1, 1, - 1, 0, 1 ); // https://github.com/mrdoob/three.js/pull/21358
+
+
+	const _geometry = new THREE.BufferGeometry();
+
+	_geometry.setAttribute( 'position', new THREE.Float32BufferAttribute( [ - 1, 3, 0, - 1, - 1, 0, 3, - 1, 0 ], 3 ) );
+
+	_geometry.setAttribute( 'uv', new THREE.Float32BufferAttribute( [ 0, 2, 0, 0, 2, 0 ], 2 ) );
+
+	class FullScreenQuad {
+
+		constructor( material ) {
+
+			this._mesh = new THREE.Mesh( _geometry, material );
+
+		}
+
+		dispose() {
+
+			this._mesh.geometry.dispose();
+
+		}
+
+		render( renderer ) {
+
+			renderer.render( this._mesh, _camera );
+
+		}
+
+		get material() {
+
+			return this._mesh.material;
+
+		}
+
+		set material( value ) {
+
+			this._mesh.material = value;
+
+		}
+
+	}
+
+	THREE.EffectComposer = EffectComposer;
+	THREE.FullScreenQuad = FullScreenQuad;
+	THREE.Pass = Pass;
+
+} )();
+
+( function () {
+
+	class RenderPass extends THREE.Pass {
+
+		constructor( scene, camera, overrideMaterial, clearColor, clearAlpha ) {
+
+			super();
+			this.scene = scene;
+			this.camera = camera;
+			this.overrideMaterial = overrideMaterial;
+			this.clearColor = clearColor;
+			this.clearAlpha = clearAlpha !== undefined ? clearAlpha : 0;
+			this.clear = true;
+			this.clearDepth = false;
+			this.needsSwap = false;
+			this._oldClearColor = new THREE.Color();
+
+		}
+
+		render( renderer, writeBuffer, readBuffer
+			/*, deltaTime, maskActive */
+		) {
+
+			const oldAutoClear = renderer.autoClear;
+			renderer.autoClear = false;
+			let oldClearAlpha, oldOverrideMaterial;
+
+			if ( this.overrideMaterial !== undefined ) {
+
+				oldOverrideMaterial = this.scene.overrideMaterial;
+				this.scene.overrideMaterial = this.overrideMaterial;
+
+			}
+
+			if ( this.clearColor ) {
+
+				renderer.getClearColor( this._oldClearColor );
+				oldClearAlpha = renderer.getClearAlpha();
+				renderer.setClearColor( this.clearColor, this.clearAlpha );
+
+			}
+
+			if ( this.clearDepth ) {
+
+				renderer.clearDepth();
+
+			}
+
+			renderer.setRenderTarget( this.renderToScreen ? null : readBuffer ); // TODO: Avoid using autoClear properties, see https://github.com/mrdoob/three.js/pull/15571#issuecomment-465669600
+
+			if ( this.clear ) renderer.clear( renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil );
+			renderer.render( this.scene, this.camera );
+
+			if ( this.clearColor ) {
+
+				renderer.setClearColor( this._oldClearColor, oldClearAlpha );
+
+			}
+
+			if ( this.overrideMaterial !== undefined ) {
+
+				this.scene.overrideMaterial = oldOverrideMaterial;
+
+			}
+
+			renderer.autoClear = oldAutoClear;
+
+		}
+
+	}
+
+	THREE.RenderPass = RenderPass;
+
+} )();
+
+( function () {
+
+	class ShaderPass extends THREE.Pass {
+
+		constructor( shader, textureID ) {
+
+			super();
+			this.textureID = textureID !== undefined ? textureID : 'tDiffuse';
+
+			if ( shader instanceof THREE.ShaderMaterial ) {
+
+				this.uniforms = shader.uniforms;
+				this.material = shader;
+
+			} else if ( shader ) {
+
+				this.uniforms = THREE.UniformsUtils.clone( shader.uniforms );
+				this.material = new THREE.ShaderMaterial( {
+					defines: Object.assign( {}, shader.defines ),
+					uniforms: this.uniforms,
+					vertexShader: shader.vertexShader,
+					fragmentShader: shader.fragmentShader
+				} );
+
+			}
+
+			this.fsQuad = new THREE.FullScreenQuad( this.material );
+
+		}
+
+		render( renderer, writeBuffer, readBuffer
+			/*, deltaTime, maskActive */
+		) {
+
+			if ( this.uniforms[ this.textureID ] ) {
+
+				this.uniforms[ this.textureID ].value = readBuffer.texture;
+
+			}
+
+			this.fsQuad.material = this.material;
+
+			if ( this.renderToScreen ) {
+
+				renderer.setRenderTarget( null );
+				this.fsQuad.render( renderer );
+
+			} else {
+
+				renderer.setRenderTarget( writeBuffer ); // TODO: Avoid using autoClear properties, see https://github.com/mrdoob/three.js/pull/15571#issuecomment-465669600
+
+				if ( this.clear ) renderer.clear( renderer.autoClearColor, renderer.autoClearDepth, renderer.autoClearStencil );
+				this.fsQuad.render( renderer );
+
+			}
+
+		}
+
+	}
+
+	THREE.ShaderPass = ShaderPass;
+
+} )();
+
+( function () {
+
+	/**
+ * UnrealBloomPass is inspired by the bloom pass of Unreal Engine. It creates a
+ * mip map chain of bloom textures and blurs them with different radii. Because
+ * of the weighted combination of mips, and because larger blurs are done on
+ * higher mips, this effect provides good quality and performance.
+ *
+ * Reference:
+ * - https://docs.unrealengine.com/latest/INT/Engine/Rendering/PostProcessEffects/Bloom/
+ */
+
+	class UnrealBloomPass extends THREE.Pass {
+
+		constructor( resolution, strength, radius, threshold ) {
+
+			super();
+			this.strength = strength !== undefined ? strength : 1;
+			this.radius = radius;
+			this.threshold = threshold;
+			this.resolution = resolution !== undefined ? new THREE.Vector2( resolution.x, resolution.y ) : new THREE.Vector2( 256, 256 ); // create color only once here, reuse it later inside the render function
+
+			this.clearColor = new THREE.Color( 0, 0, 0 ); // render targets
+
+			const pars = {
+				minFilter: THREE.LinearFilter,
+				magFilter: THREE.LinearFilter,
+				format: THREE.RGBAFormat
+			};
+			this.renderTargetsHorizontal = [];
+			this.renderTargetsVertical = [];
+			this.nMips = 5;
+			let resx = Math.round( this.resolution.x / 2 );
+			let resy = Math.round( this.resolution.y / 2 );
+			this.renderTargetBright = new THREE.WebGLRenderTarget( resx, resy, pars );
+			this.renderTargetBright.texture.name = 'UnrealBloomPass.bright';
+			this.renderTargetBright.texture.generateMipmaps = false;
+
+			for ( let i = 0; i < this.nMips; i ++ ) {
+
+				const renderTargetHorizonal = new THREE.WebGLRenderTarget( resx, resy, pars );
+				renderTargetHorizonal.texture.name = 'UnrealBloomPass.h' + i;
+				renderTargetHorizonal.texture.generateMipmaps = false;
+				this.renderTargetsHorizontal.push( renderTargetHorizonal );
+				const renderTargetVertical = new THREE.WebGLRenderTarget( resx, resy, pars );
+				renderTargetVertical.texture.name = 'UnrealBloomPass.v' + i;
+				renderTargetVertical.texture.generateMipmaps = false;
+				this.renderTargetsVertical.push( renderTargetVertical );
+				resx = Math.round( resx / 2 );
+				resy = Math.round( resy / 2 );
+
+			} // luminosity high pass material
+
+
+			if ( THREE.LuminosityHighPassShader === undefined ) console.error( 'THREE.UnrealBloomPass relies on THREE.LuminosityHighPassShader' );
+			const highPassShader = THREE.LuminosityHighPassShader;
+			this.highPassUniforms = THREE.UniformsUtils.clone( highPassShader.uniforms );
+			this.highPassUniforms[ 'luminosityThreshold' ].value = threshold;
+			this.highPassUniforms[ 'smoothWidth' ].value = 0.01;
+			this.materialHighPassFilter = new THREE.ShaderMaterial( {
+				uniforms: this.highPassUniforms,
+				vertexShader: highPassShader.vertexShader,
+				fragmentShader: highPassShader.fragmentShader,
+				defines: {}
+			} ); // Gaussian Blur Materials
+
+			this.separableBlurMaterials = [];
+			const kernelSizeArray = [ 3, 5, 7, 9, 11 ];
+			resx = Math.round( this.resolution.x / 2 );
+			resy = Math.round( this.resolution.y / 2 );
+
+			for ( let i = 0; i < this.nMips; i ++ ) {
+
+				this.separableBlurMaterials.push( this.getSeperableBlurMaterial( kernelSizeArray[ i ] ) );
+				this.separableBlurMaterials[ i ].uniforms[ 'texSize' ].value = new THREE.Vector2( resx, resy );
+				resx = Math.round( resx / 2 );
+				resy = Math.round( resy / 2 );
+
+			} // Composite material
+
+
+			this.compositeMaterial = this.getCompositeMaterial( this.nMips );
+			this.compositeMaterial.uniforms[ 'blurTexture1' ].value = this.renderTargetsVertical[ 0 ].texture;
+			this.compositeMaterial.uniforms[ 'blurTexture2' ].value = this.renderTargetsVertical[ 1 ].texture;
+			this.compositeMaterial.uniforms[ 'blurTexture3' ].value = this.renderTargetsVertical[ 2 ].texture;
+			this.compositeMaterial.uniforms[ 'blurTexture4' ].value = this.renderTargetsVertical[ 3 ].texture;
+			this.compositeMaterial.uniforms[ 'blurTexture5' ].value = this.renderTargetsVertical[ 4 ].texture;
+			this.compositeMaterial.uniforms[ 'bloomStrength' ].value = strength;
+			this.compositeMaterial.uniforms[ 'bloomRadius' ].value = 0.1;
+			this.compositeMaterial.needsUpdate = true;
+			const bloomFactors = [ 1.0, 0.8, 0.6, 0.4, 0.2 ];
+			this.compositeMaterial.uniforms[ 'bloomFactors' ].value = bloomFactors;
+			this.bloomTintColors = [ new THREE.Vector3( 1, 1, 1 ), new THREE.Vector3( 1, 1, 1 ), new THREE.Vector3( 1, 1, 1 ), new THREE.Vector3( 1, 1, 1 ), new THREE.Vector3( 1, 1, 1 ) ];
+			this.compositeMaterial.uniforms[ 'bloomTintColors' ].value = this.bloomTintColors; // copy material
+
+			if ( THREE.CopyShader === undefined ) {
+
+				console.error( 'THREE.UnrealBloomPass relies on THREE.CopyShader' );
+
+			}
+
+			const copyShader = THREE.CopyShader;
+			this.copyUniforms = THREE.UniformsUtils.clone( copyShader.uniforms );
+			this.copyUniforms[ 'opacity' ].value = 1.0;
+			this.materialCopy = new THREE.ShaderMaterial( {
+				uniforms: this.copyUniforms,
+				vertexShader: copyShader.vertexShader,
+				fragmentShader: copyShader.fragmentShader,
+				blending: THREE.AdditiveBlending,
+				depthTest: false,
+				depthWrite: false,
+				transparent: true
+			} );
+			this.enabled = true;
+			this.needsSwap = false;
+			this._oldClearColor = new THREE.Color();
+			this.oldClearAlpha = 1;
+			this.basic = new THREE.MeshBasicMaterial();
+			this.fsQuad = new THREE.FullScreenQuad( null );
+
+		}
+
+		dispose() {
+
+			for ( let i = 0; i < this.renderTargetsHorizontal.length; i ++ ) {
+
+				this.renderTargetsHorizontal[ i ].dispose();
+
+			}
+
+			for ( let i = 0; i < this.renderTargetsVertical.length; i ++ ) {
+
+				this.renderTargetsVertical[ i ].dispose();
+
+			}
+
+			this.renderTargetBright.dispose();
+
+		}
+
+		setSize( width, height ) {
+
+			let resx = Math.round( width / 2 );
+			let resy = Math.round( height / 2 );
+			this.renderTargetBright.setSize( resx, resy );
+
+			for ( let i = 0; i < this.nMips; i ++ ) {
+
+				this.renderTargetsHorizontal[ i ].setSize( resx, resy );
+				this.renderTargetsVertical[ i ].setSize( resx, resy );
+				this.separableBlurMaterials[ i ].uniforms[ 'texSize' ].value = new THREE.Vector2( resx, resy );
+				resx = Math.round( resx / 2 );
+				resy = Math.round( resy / 2 );
+
+			}
+
+		}
+
+		render( renderer, writeBuffer, readBuffer, deltaTime, maskActive ) {
+
+			renderer.getClearColor( this._oldClearColor );
+			this.oldClearAlpha = renderer.getClearAlpha();
+			const oldAutoClear = renderer.autoClear;
+			renderer.autoClear = false;
+			renderer.setClearColor( this.clearColor, 0 );
+			if ( maskActive ) renderer.state.buffers.stencil.setTest( false ); // Render input to screen
+
+			if ( this.renderToScreen ) {
+
+				this.fsQuad.material = this.basic;
+				this.basic.map = readBuffer.texture;
+				renderer.setRenderTarget( null );
+				renderer.clear();
+				this.fsQuad.render( renderer );
+
+			} // 1. Extract Bright Areas
+
+
+			this.highPassUniforms[ 'tDiffuse' ].value = readBuffer.texture;
+			this.highPassUniforms[ 'luminosityThreshold' ].value = this.threshold;
+			this.fsQuad.material = this.materialHighPassFilter;
+			renderer.setRenderTarget( this.renderTargetBright );
+			renderer.clear();
+			this.fsQuad.render( renderer ); // 2. Blur All the mips progressively
+
+			let inputRenderTarget = this.renderTargetBright;
+
+			for ( let i = 0; i < this.nMips; i ++ ) {
+
+				this.fsQuad.material = this.separableBlurMaterials[ i ];
+				this.separableBlurMaterials[ i ].uniforms[ 'colorTexture' ].value = inputRenderTarget.texture;
+				this.separableBlurMaterials[ i ].uniforms[ 'direction' ].value = UnrealBloomPass.BlurDirectionX;
+				renderer.setRenderTarget( this.renderTargetsHorizontal[ i ] );
+				renderer.clear();
+				this.fsQuad.render( renderer );
+				this.separableBlurMaterials[ i ].uniforms[ 'colorTexture' ].value = this.renderTargetsHorizontal[ i ].texture;
+				this.separableBlurMaterials[ i ].uniforms[ 'direction' ].value = UnrealBloomPass.BlurDirectionY;
+				renderer.setRenderTarget( this.renderTargetsVertical[ i ] );
+				renderer.clear();
+				this.fsQuad.render( renderer );
+				inputRenderTarget = this.renderTargetsVertical[ i ];
+
+			} // Composite All the mips
+
+
+			this.fsQuad.material = this.compositeMaterial;
+			this.compositeMaterial.uniforms[ 'bloomStrength' ].value = this.strength;
+			this.compositeMaterial.uniforms[ 'bloomRadius' ].value = this.radius;
+			this.compositeMaterial.uniforms[ 'bloomTintColors' ].value = this.bloomTintColors;
+			renderer.setRenderTarget( this.renderTargetsHorizontal[ 0 ] );
+			renderer.clear();
+			this.fsQuad.render( renderer ); // Blend it additively over the input texture
+
+			this.fsQuad.material = this.materialCopy;
+			this.copyUniforms[ 'tDiffuse' ].value = this.renderTargetsHorizontal[ 0 ].texture;
+			if ( maskActive ) renderer.state.buffers.stencil.setTest( true );
+
+			if ( this.renderToScreen ) {
+
+				renderer.setRenderTarget( null );
+				this.fsQuad.render( renderer );
+
+			} else {
+
+				renderer.setRenderTarget( readBuffer );
+				this.fsQuad.render( renderer );
+
+			} // Restore renderer settings
+
+
+			renderer.setClearColor( this._oldClearColor, this.oldClearAlpha );
+			renderer.autoClear = oldAutoClear;
+
+		}
+
+		getSeperableBlurMaterial( kernelRadius ) {
+
+			return new THREE.ShaderMaterial( {
+				defines: {
+					'KERNEL_RADIUS': kernelRadius,
+					'SIGMA': kernelRadius
+				},
+				uniforms: {
+					'colorTexture': {
+						value: null
+					},
+					'texSize': {
+						value: new THREE.Vector2( 0.5, 0.5 )
+					},
+					'direction': {
+						value: new THREE.Vector2( 0.5, 0.5 )
+					}
+				},
+				vertexShader: `varying vec2 vUv;
+				void main() {
+					vUv = uv;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+				}`,
+				fragmentShader: `#include <common>
+				varying vec2 vUv;
+				uniform sampler2D colorTexture;
+				uniform vec2 texSize;
+				uniform vec2 direction;
+
+				float gaussianPdf(in float x, in float sigma) {
+					return 0.39894 * exp( -0.5 * x * x/( sigma * sigma))/sigma;
+				}
+				void main() {
+					vec2 invSize = 1.0 / texSize;
+					float fSigma = float(SIGMA);
+					float weightSum = gaussianPdf(0.0, fSigma);
+					vec3 diffuseSum = texture2D( colorTexture, vUv).rgb * weightSum;
+					for( int i = 1; i < KERNEL_RADIUS; i ++ ) {
+						float x = float(i);
+						float w = gaussianPdf(x, fSigma);
+						vec2 uvOffset = direction * invSize * x;
+						vec3 sample1 = texture2D( colorTexture, vUv + uvOffset).rgb;
+						vec3 sample2 = texture2D( colorTexture, vUv - uvOffset).rgb;
+						diffuseSum += (sample1 + sample2) * w;
+						weightSum += 2.0 * w;
+					}
+					gl_FragColor = vec4(diffuseSum/weightSum, 1.0);
+				}`
+			} );
+
+		}
+
+		getCompositeMaterial( nMips ) {
+
+			return new THREE.ShaderMaterial( {
+				defines: {
+					'NUM_MIPS': nMips
+				},
+				uniforms: {
+					'blurTexture1': {
+						value: null
+					},
+					'blurTexture2': {
+						value: null
+					},
+					'blurTexture3': {
+						value: null
+					},
+					'blurTexture4': {
+						value: null
+					},
+					'blurTexture5': {
+						value: null
+					},
+					'dirtTexture': {
+						value: null
+					},
+					'bloomStrength': {
+						value: 1.0
+					},
+					'bloomFactors': {
+						value: null
+					},
+					'bloomTintColors': {
+						value: null
+					},
+					'bloomRadius': {
+						value: 0.0
+					}
+				},
+				vertexShader: `varying vec2 vUv;
+				void main() {
+					vUv = uv;
+					gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+				}`,
+				fragmentShader: `varying vec2 vUv;
+				uniform sampler2D blurTexture1;
+				uniform sampler2D blurTexture2;
+				uniform sampler2D blurTexture3;
+				uniform sampler2D blurTexture4;
+				uniform sampler2D blurTexture5;
+				uniform sampler2D dirtTexture;
+				uniform float bloomStrength;
+				uniform float bloomRadius;
+				uniform float bloomFactors[NUM_MIPS];
+				uniform vec3 bloomTintColors[NUM_MIPS];
+
+				float lerpBloomFactor(const in float factor) {
+					float mirrorFactor = 1.2 - factor;
+					return mix(factor, mirrorFactor, bloomRadius);
+				}
+
+				void main() {
+					gl_FragColor = bloomStrength * ( lerpBloomFactor(bloomFactors[0]) * vec4(bloomTintColors[0], 1.0) * texture2D(blurTexture1, vUv) +
+						lerpBloomFactor(bloomFactors[1]) * vec4(bloomTintColors[1], 1.0) * texture2D(blurTexture2, vUv) +
+						lerpBloomFactor(bloomFactors[2]) * vec4(bloomTintColors[2], 1.0) * texture2D(blurTexture3, vUv) +
+						lerpBloomFactor(bloomFactors[3]) * vec4(bloomTintColors[3], 1.0) * texture2D(blurTexture4, vUv) +
+						lerpBloomFactor(bloomFactors[4]) * vec4(bloomTintColors[4], 1.0) * texture2D(blurTexture5, vUv) );
+				}`
+			} );
+
+		}
+
+	}
+
+	UnrealBloomPass.BlurDirectionX = new THREE.Vector2( 1.0, 0.0 );
+	UnrealBloomPass.BlurDirectionY = new THREE.Vector2( 0.0, 1.0 );
+
+	THREE.UnrealBloomPass = UnrealBloomPass;
+
+} )();
+
+</script>
+<script>
+// 블록 동물 도안. 3D 모델의 옆모습을 그대로 한 장의 그림으로 그린다. 시연 페이지와 인쇄용 PDF가 같은 코드를 쓴다.
+(function (root) {
+  const AW = 1024, AH = 640, OFF = 50, SW = AW + OFF * 2, SH = AH + OFF * 2, K = 215, BASE = 560;
+  // 인쇄 도안의 모서리 표식 중심(도안지 좌표). 순서: 왼쪽 위, 오른쪽 위, 왼쪽 아래, 오른쪽 아래
+  const MARKS = [[30, 30], [SW - 30, 30], [30, SH - 30], [SW - 30, SH - 30]];
+  const KO = { cow: "소", pig: "돼지", dog: "강아지" };
+  const FONT = '"IBM Plex Sans KR", "Noto Sans CJK KR", "Malgun Gothic", sans-serif';
+  // 모델 치수: body [폭, 높이, 길이], leg [굵기, 길이], head [폭, 높이, 깊이], snout [폭, 높이, 깊이, 높이 위치]
+  const SHAPES = {
+    cow: { body: [1.05, 0.95, 1.8], leg: [0.34, 0.8], head: [0.9, 0.85, 0.8], snout: [0.62, 0.36, 0.2, -0.2], ears: "side", horns: true, tail: [0.1, 0.8, 0.02], scale: 1.05 },
+    pig: { body: [1.12, 0.92, 1.6], leg: [0.32, 0.48], head: [0.95, 0.85, 0.75], snout: [0.44, 0.34, 0.2, -0.1], ears: "top", tail: [0.12, 0.3, 0.5], scale: 1.05 },
+    dog: { body: [0.8, 0.75, 1.5], leg: [0.26, 0.7], head: [0.8, 0.75, 0.75], snout: [0.42, 0.34, 0.36, -0.14], ears: "flop", nose: true, tail: [0.12, 0.6, -0.9], scale: 1.1 },
+  };
+  // 옆에서 본 각 부위의 자리. 모델 좌표(z: 뒤→앞, y: 아래→위)와 도안 픽셀 좌표를 함께 돌려준다.
+  function layout(kind) {
+    const S = SHAPES[kind], [, bh, bl] = S.body, [lw, lh] = S.leg, [, hh, hd] = S.head, [, sh, sd, sy] = S.snout;
+    const cy = lh + bh * 0.72, cz = bl / 2 + hd * 0.28, lz = bl / 2 - lw / 2 - 0.04, tl = Math.max(S.tail[1], 0.45);
+    const m = {
+      tail: S.tail[2] < -0.5 ? { z0: -bl / 2 - 0.26, z1: -bl / 2 + 0.02, y0: lh + bh * 0.7, y1: lh + bh * 0.7 + tl } : { z0: -bl / 2 - 0.3, z1: -bl / 2 + 0.02, y0: lh + bh * 0.85 - tl, y1: lh + bh * 0.85 },
+      legB: { z0: -lz - lw / 2, z1: -lz + lw / 2, y0: 0, y1: lh }, legF: { z0: lz - lw / 2, z1: lz + lw / 2, y0: 0, y1: lh },
+      body: { z0: -bl / 2, z1: bl / 2, y0: lh, y1: lh + bh },
+      head: { z0: cz - hd / 2, z1: cz + hd / 2, y0: cy - hh / 2, y1: cy + hh / 2 },
+      ear: S.ears === "top" ? { z0: cz - 0.2, z1: cz + 0.14, y0: cy + hh / 2 - 0.02, y1: cy + hh / 2 + 0.3 } : S.ears === "side" ? { z0: cz - hd / 2 - 0.3, z1: cz - hd / 2 + 0.04, y0: cy + hh * 0.12, y1: cy + hh * 0.42 } : { z0: cz - 0.32, z1: cz + 0.02, y0: cy - 0.24, y1: cy + hh * 0.4 },
+      snout: { z0: cz + hd / 2 - 0.02, z1: cz + hd / 2 + sd, y0: cy + sy - sh / 2, y1: cy + sy + sh / 2 },
+    };
+    let zmin = 9, zmax = -9; for (const r of Object.values(m)) { zmin = Math.min(zmin, r.z0); zmax = Math.max(zmax, r.z1); }
+    const zc = (zmin + zmax) / 2, px = {};
+    for (const [n, r] of Object.entries(m)) px[n] = { x: AW / 2 + (r.z0 - zc) * K, y: BASE - r.y1 * K, w: (r.z1 - r.z0) * K, h: (r.y1 - r.y0) * K };
+    const order = S.ears === "side" ? ["tail", "legB", "legF", "body", "ear", "head", "snout"] : ["tail", "legB", "legF", "body", "head", "ear", "snout"];
+    // 몸통에 입힐 때는 머리 그림과 겹치는 앞부분을 빼고 가져온다.
+    const uv = Object.assign({}, px); if (px.head.x < px.body.x + px.body.w) uv.body = Object.assign({}, px.body, { w: px.head.x - px.body.x + 5 });
+    return { px, uv, order, eye: { x: AW / 2 + (cz + hd * 0.16 - zc) * K, y: BASE - (cy + hh * 0.14) * K } };
+  }
+  function drawTemplate(x, kind) {
+    const L = layout(kind); x.save(); x.lineJoin = "round"; x.lineWidth = 5; x.strokeStyle = "#222";
+    for (const n of L.order) { const r = L.px[n]; x.fillStyle = "#fff"; x.fillRect(r.x, r.y, r.w, r.h); x.strokeRect(r.x, r.y, r.w, r.h); }
+    x.fillStyle = "#222"; x.beginPath(); x.arc(L.eye.x, L.eye.y, 11, 0, 7); x.fill();
+    x.fillStyle = "#666"; x.font = "500 17px " + FONT; x.textBaseline = "top"; x.fillText(KO[kind] + "를 마음껏 색칠해 주세요. 무늬를 그려 넣어도 좋아요.", 30, 598);
+    x.restore();
+  }
+  function blobs(x, r, col, list) { x.save(); x.beginPath(); x.rect(r.x, r.y, r.w, r.h); x.clip(); x.fillStyle = col; for (const [fx, fy, rw, rh] of list) { x.beginPath(); x.ellipse(r.x + r.w * fx, r.y + r.h * fy, r.w * rw, r.h * rh, 0.4, 0, 7); x.fill(); } x.restore(); }
+  // 예시로 미리 칠해 둔 그림. 부위가 겹치는 순서는 도안과 같다.
+  function drawPreset(x, kind, variant) {
+    const L = layout(kind), P = L.px, col = {}, after = [];
+    if (kind === "cow") { const base = variant ? "#F3E3C8" : "#FBF8F1", spot = variant ? "#8A5A2B" : "#2E2E2E"; for (const n of L.order) col[n] = base; col.snout = "#F7B6C2"; col.ear = spot;
+      after.push(["body", spot, [[0.2, 0.3, 0.14, 0.3], [0.55, 0.7, 0.16, 0.3], [0.8, 0.1, 0.12, 0.22], [0.42, 0.02, 0.1, 0.16]]], ["head", spot, [[0.2, 0.2, 0.25, 0.3]]], ["legB", spot, [[0.5, 0.95, 0.7, 0.1]]], ["legF", spot, [[0.5, 0.95, 0.7, 0.1]]]); }
+    else if (kind === "pig") { for (const n of L.order) col[n] = "#F7B6C2"; col.snout = "#EE8FA3"; col.ear = "#EE8FA3";
+      after.push(["head", "#EE8FA3", [[0.5, 0.72, 0.14, 0.12]]], ["legB", "#B5677A", [[0.5, 0.93, 0.7, 0.12]]], ["legF", "#B5677A", [[0.5, 0.93, 0.7, 0.12]]], ["body", "#EE8FA3", [[0.5, 1.0, 0.45, 0.2]]]); }
+    else { const base = variant ? "#F2EDE4" : "#D9A066", dark = variant ? "#3B3B3B" : "#8A5A2B"; for (const n of L.order) col[n] = base; col.ear = dark; col.tail = dark; col.snout = variant ? "#F2EDE4" : "#FFF1D6";
+      after.push(["body", dark, [[0.35, 0.05, 0.22, 0.4]]], ["legB", variant ? "#3B3B3B" : "#FFF1D6", [[0.5, 0.93, 0.7, 0.14]]], ["legF", variant ? "#3B3B3B" : "#FFF1D6", [[0.5, 0.93, 0.7, 0.14]]]); }
+    for (const n of L.order) { const r = P[n]; x.fillStyle = col[n]; x.fillRect(r.x, r.y, r.w, r.h); const a = after.filter((k) => k[0] === n); for (const [, c, list] of a) blobs(x, r, c, list); }
+  }
+  // 인쇄용 도안지: 흰 바탕, 모서리 표식 네 개, 가운데에 그림
+  function drawSheet(x, kind) {
+    x.fillStyle = "#fff"; x.fillRect(0, 0, SW, SH);
+    for (const [cx, cy] of MARKS) { x.fillStyle = "#000"; x.fillRect(cx - 18, cy - 18, 36, 36); x.fillStyle = "#fff"; x.fillRect(cx - 6, cy - 6, 12, 12); }
+    x.save(); x.translate(OFF, OFF); drawTemplate(x, kind); x.restore();
+  }
+  const api = { AW, AH, OFF, SW, SH, MARKS, KO, SHAPES, layout, drawTemplate, drawPreset, drawSheet };
+  if (typeof module !== "undefined") module.exports = api;
+  root.TPL = api;
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+(function () {
+"use strict";
+// ================================================================ 기본 준비
+const $ = (id) => document.getElementById(id);
+const toastEl = $("toast"); let toastTimer = 0;
+function toast(msg, err) { toastEl.textContent = msg; toastEl.className = err ? "err" : ""; toastEl.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (toastEl.hidden = true), err ? 5500 : 2400); }
+if (!window.THREE) { toast("3D 라이브러리를 불러오지 못했습니다. 네트워크를 확인하고 새로 고쳐 주세요.", true); return; }
+const params = new URLSearchParams(location.search);
+const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const TPL = window.TPL, AW = TPL.AW, AH = TPL.AH;
+const canvas = $("gl"); let renderer;
+try { renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: "high-performance" }); } catch (e) { toast("이 기기에서는 3D 화면을 열 수 없습니다.", true); return; }
+const GL2 = renderer.capabilities.isWebGL2;
+const LOW = params.get("q") === "low" || (params.get("q") !== "high" && (Math.min(screen.width, screen.height) < 700 || !GL2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW ? 1.5 : 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.fog = new THREE.Fog(0xffffff, 45, 170);
+const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 700);
+// 색은 눈에 보이는 색(sRGB)으로 적고, 계산할 때는 선형 값으로 바꿔 쓴다.
+const L = (hex) => new THREE.Color(hex).convertSRGBToLinear();
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smooth = (a, b, v) => { const t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const rnd = (() => { let a = 20261012; return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; })();
+const vnoise = (() => { const h = (x, y) => { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }; return (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v) + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v; }; })();
+const fbm2 = (x, y) => vnoise(x, y) * 0.55 + vnoise(x * 2.1 + 7, y * 2.1 + 3) * 0.3 + vnoise(x * 4.3 + 1, y * 4.3 + 9) * 0.15;
+const uTime = { value: 0 };
+
+// ================================================================ 시간대와 계절
+const TIMES = {
+  day:    { top: 0x3f8edb, mid: 0xa4d2f2, bot: 0xeef5f2, fog: 0xd9e9ee, sun: 0xfff0d2, sunI: 2.5, sunDir: [0.42, 0.74, 0.52], disk: 0xfff6e0, hemiS: 0xcfe5ff, hemiG: 0x6f8a55, hemiI: 0.45, glow: 0, hgk: 0.55, cloud: 0xffffff, cloudAmt: 0.5, mtn: 0x8fb0c4, mtnFar: 0xbcd3e0, stars: 0, expo: 0.95, bloomS: 0.32, bloomT: 0.9, lamp: 0, fire: 0, vig: 0.26, env: 0.9, fogN: 55, fogF: 190 },
+  sunset: { top: 0x2c4583, mid: 0xf08a5d, bot: 0xffc77a, fog: 0xf3b07f, sun: 0xff9248, sunI: 3.1, sunDir: [0.35, 0.16, -0.92], disk: 0xffd08a, hemiS: 0xf4b48c, hemiG: 0x5e523c, hemiI: 0.42, glow: 0.06, hgk: 0.45, cloud: 0xf6b99a, cloudAmt: 0.6, mtn: 0x8a6f92, mtnFar: 0xc99a9c, stars: 0, expo: 1.06, bloomS: 0.55, bloomT: 0.8, lamp: 0.55, fire: 0.25, vig: 0.36, env: 0.8, fogN: 45, fogF: 170 },
+  night:  { top: 0x040a1c, mid: 0x14254d, bot: 0x2e4372, fog: 0x1b2847, sun: 0xa9c0ff, sunI: 0.75, sunDir: [-0.35, 0.38, -0.86], disk: 0xf2f4ff, hemiS: 0x3b5288, hemiG: 0x10141d, hemiI: 0.55, glow: 0.3, hgk: 0.14, cloud: 0x24365e, cloudAmt: 0.35, mtn: 0x17254a, mtnFar: 0x22355f, stars: 1, expo: 1.2, bloomS: 0.95, bloomT: 0.55, lamp: 1.6, fire: 1, vig: 0.45, env: 0.45, fogN: 40, fogF: 150 },
+};
+const SEASONS = {
+  spring: { ground: 0x5f9e45, ground2: 0xa8c75c, path: 0xd3b88e, grass: 0x84c25a, leaves: [0x78c262, 0x9fd36f, 0xf5b8d0], pine: 0x2f6a48, snow: 0, part: 0, pcol: 0xffc2da, fall: 0.55, flowers: [0xff9ec7, 0xffffff, 0xffe066, 0xc6a2ff, 0xff7a9a] },
+  summer: { ground: 0x48903e, ground2: 0x8ab84b, path: 0xd6b98a, grass: 0x5aa84a, leaves: [0x3f9a4a, 0x2f8040, 0x6db24c], pine: 0x235c3d, snow: 0, part: 1, pcol: 0xfff1a8, fall: -0.08, flowers: [0xffd23f, 0xffffff, 0x6aa8ff, 0xff6b6b, 0xffa53f] },
+  autumn: { ground: 0x93863c, ground2: 0xc6a24a, path: 0xc9a37b, grass: 0xc7a14c, leaves: [0xe0782e, 0xe0a832, 0xc0432c], pine: 0x2e5a40, snow: 0, part: 2, pcol: 0xe8792f, fall: 0.9, flowers: [0xff8c42, 0xb565d9, 0xffd23f, 0xd94f3d] },
+  winter: { ground: 0xe9eff6, ground2: 0xffffff, path: 0xc8d2de, grass: 0xe2eaf2, leaves: [0xdfe8ee, 0xe9f0f4, 0xd6e0e8], pine: 0x2a5845, snow: 1, part: 3, pcol: 0xffffff, fall: 0.85, flowers: [] },
+};
+let timeKey = TIMES[params.get("time")] ? params.get("time") : "sunset", seasonKey = SEASONS[params.get("season")] ? params.get("season") : "spring";
+// cur: 지금 화면에 쓰는 값. 매 프레임 목표값 쪽으로 조금씩 옮겨 부드럽게 바뀐다.
+const cur = {}; const COLS_T = ["top", "mid", "bot", "fog", "sun", "disk", "hemiS", "hemiG", "cloud", "mtn", "mtnFar"], NUMS_T = ["sunI", "hemiI", "glow", "hgk", "cloudAmt", "stars", "expo", "bloomS", "bloomT", "lamp", "fire", "vig", "env", "fogN", "fogF"];
+const COLS_S = ["ground", "ground2", "path", "grass", "pine", "pcol"], NUMS_S = ["snow", "fall"];
+for (const k of [...COLS_T, ...COLS_S]) cur[k] = new THREE.Color();
+cur.leaves = [new THREE.Color(), new THREE.Color(), new THREE.Color()]; cur.sunDir = new THREE.Vector3();
+function blendLook(k) {
+  const T = TIMES[timeKey], S = SEASONS[seasonKey];
+  for (const c of COLS_T) cur[c].lerp(L(T[c]), k); for (const n of NUMS_T) cur[n] = cur[n] === undefined ? T[n] : cur[n] + (T[n] - cur[n]) * k;
+  for (const c of COLS_S) cur[c].lerp(L(S[c]), k); for (const n of NUMS_S) cur[n] = cur[n] === undefined ? S[n] : cur[n] + (S[n] - cur[n]) * k;
+  cur.leaves.forEach((c, i) => c.lerp(L(S.leaves[i]), k)); cur.sunDir.lerp(new THREE.Vector3(...T.sunDir).normalize(), k).normalize();
+}
+blendLook(1);
+
+// ================================================================ 하늘: 그라데이션, 해·달, 흘러가는 구름, 별
+const NOISE_GLSL = `
+float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f); return mix(mix(h21(i), h21(i + vec2(1, 0)), u.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), u.x), u.y); }
+float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * vn(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; } return s; }`;
+const skyU = { top: { value: cur.top }, mid: { value: cur.mid }, bot: { value: cur.bot }, sunCol: { value: cur.disk }, cloudCol: { value: cur.cloud }, sunDir: { value: cur.sunDir }, cloudAmt: { value: 0.5 }, stars: { value: 0 }, time: uTime };
+const skyMat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: skyU,
+  vertexShader: "varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform vec3 top, mid, bot, sunCol, cloudCol, sunDir; uniform float cloudAmt, stars, time; varying vec3 vP; ${NOISE_GLSL}
+  void main(){
+    vec3 d = normalize(vP); float h = d.y;
+    vec3 c = mix(mix(bot, mid, smoothstep(-0.04, 0.2, h)), top, smoothstep(0.14, 0.75, h));
+    float sd = max(dot(d, sunDir), 0.0);
+    c += sunCol * (pow(sd, 5.0) * 0.32 + pow(sd, 48.0) * 0.55);
+    c += sunCol * smoothstep(0.99935, 0.9997, sd) * 4.0;
+    if (h > 0.0) {
+      vec2 uv = d.xz / (h + 0.16) * 0.85 + vec2(time * 0.008, time * 0.002);
+      float n = fbm(uv * 1.25), cl = smoothstep(0.58 - cloudAmt * 0.22, 0.9, n) * smoothstep(0.0, 0.16, h);
+      vec3 cc = mix(cloudCol, cloudCol * 0.72, smoothstep(0.6, 0.95, n)) + sunCol * pow(sd, 4.0) * 0.5;
+      c = mix(c, cc, cl * 0.9);
+      vec3 sp = floor(d * 260.0); float st = fract(sin(dot(sp, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+      c += vec3(step(0.9972, st)) * stars * smoothstep(0.02, 0.3, h) * (0.6 + 0.4 * sin(time * 2.0 + st * 60.0)) * (1.0 - cl);
+    }
+    gl_FragColor = vec4(c, 1.0);
+    #include <encodings_fragment>
+  }` });
+const sky = new THREE.Mesh(new THREE.SphereGeometry(480, 48, 24), skyMat); scene.add(sky);
+
+// 주변광: 하늘을 작게 구워 둔 환경 조명. 시간대가 바뀌는 동안 가끔 다시 굽는다.
+const pmrem = new THREE.PMREMGenerator(renderer); let envRT = null, envTuned = false;
+const envScene = new THREE.Scene(); envScene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 24, 12), skyMat));
+function bakeEnv() { if (!envTuned) { envTuned = true; scene.traverse((o) => { const m = o.material; if (m && m.isMeshStandardMaterial && m.userData.env === undefined) m.envMapIntensity = 0.55; }); } const old = envRT; envRT = pmrem.fromScene(envScene, 0.035); scene.environment = envRT.texture; if (old) old.dispose(); }
+
+// ================================================================ 빛
+const hemi = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.castShadow = true; sun.shadow.mapSize.set(LOW ? 2048 : 4096, LOW ? 2048 : 4096);
+Object.assign(sun.shadow.camera, { left: -44, right: 44, top: 24, bottom: -24, near: 1, far: 160 }); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.05; sun.shadow.radius = 3;
+scene.add(sun, sun.target);
+const lamps = [];
+function lamp(x, y, z, dist) { const p = new THREE.PointLight(0xffb45c, 0, dist || 14, 2); p.position.set(x, y, z); scene.add(p); lamps.push(p); return p; }
+
+// ================================================================ 땅: 들판, 길, 멀리 언덕
+const pathX = (z) => -8.5 + (z + 13.5) * 0.42 + Math.sin(z * 0.35) * 1.2;
+const POND = { x: -19.5, z: 1.5, r: 4.3 };
+const hill = (x, z) => { const r = Math.hypot(x * 0.55, z * 1.0), m = smooth(17, 34, r); let y = m * (2.2 + 2.4 * fbm2(x * 0.03 + 3, z * 0.03) + 1.4 * Math.sin(x * 0.045)) ; const pd = Math.hypot(x - POND.x, (z - POND.z) * 1.15); y -= (1 - smooth(POND.r - 1.2, POND.r + 0.6, pd)) * 0.45; return y; };
+const groundU = { uG: { value: cur.ground }, uG2: { value: cur.ground2 }, uPath: { value: cur.path } };
+const groundMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, vertexColors: true });
+groundMat.onBeforeCompile = (sh) => { Object.assign(sh.uniforms, groundU); sh.fragmentShader = "uniform vec3 uG; uniform vec3 uG2; uniform vec3 uPath;\n" + sh.fragmentShader.replace("#include <color_fragment>", "#ifdef USE_COLOR\n vec3 gc = mix(uG * 0.8, uG2, vColor.g); diffuseColor.rgb = mix(gc, uPath * (0.86 + 0.24 * vColor.g), vColor.r) * vColor.b;\n#endif"); };
+{
+  const gg = new THREE.PlaneGeometry(420, 300, 210, 150); gg.rotateX(-Math.PI / 2);
+  const p = gg.attributes.position, col = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, hill(x, z));
+    const pd = Math.abs(x - pathX(z)), pm = z > -12.5 && z < 22 ? 1 - smooth(1.0, 1.9, pd + fbm2(x * 0.6, z * 0.6) * 0.5) : 0;
+    const nv = clamp(fbm2(x * 0.09, z * 0.09) * 1.3 - 0.15, 0, 1), dpd = Math.hypot(x - POND.x, (z - POND.z) * 1.15);
+    col[i * 3] = pm; col[i * 3 + 1] = nv; col[i * 3 + 2] = 0.9 + 0.1 * vnoise(x * 0.5, z * 0.5) - (1 - smooth(POND.r - 0.4, POND.r + 0.8, dpd)) * 0.35; }
+  gg.setAttribute("color", new THREE.BufferAttribute(col, 3)); gg.computeVertexNormals();
+  const ground = new THREE.Mesh(gg, groundMat); ground.receiveShadow = true; scene.add(ground);
+}
+// 멀리 겹겹이 놓인 산 능선. 먼 줄일수록 하늘색에 가깝게.
+const mtnMats = [];
+[[-150, 34, 0.55, 3], [-210, 52, 0.75, 7], [-280, 70, 1.0, 11]].forEach(([z, hgt, far, seed], li) => {
+  const N = 140, pos = [], idx = [], W = 900;
+  for (let i = 0; i <= N; i++) { const x = -W / 2 + (W * i) / N, t = fbm2(x * 0.012 + seed, seed) * 0.75 + vnoise(x * 0.05 + seed, 1) * 0.25; pos.push(x, -12, z, x, 4 + t * hgt, z); if (i < N) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); } }
+  const g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+  const m = new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false }); m.userData.far = far; mtnMats.push(m); scene.add(new THREE.Mesh(g, m));
+});
+
+// ================================================================ 풀: 수만 포기를 한 번에 그리고, 바람에 물결치게
+const grassMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, side: THREE.DoubleSide });
+grassMat.onBeforeCompile = (sh) => { sh.uniforms.uTime = uTime; sh.fragmentShader = sh.fragmentShader.replace("( gl_FrontFacing ) ? vLightFront : vLightBack", "vLightFront").replace("( gl_FrontFacing ) ? vIndirectFront : vIndirectBack", "vIndirectFront"); sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+#ifdef USE_INSTANCING
+  vec3 ip = instanceMatrix[3].xyz; float ph = ip.x * 0.37 + ip.z * 0.23;
+  float gust = sin(ip.x * 0.11 - uTime * 1.3 + sin(ip.z * 0.2)) * 0.5 + 0.5;
+  float bend = (sin(uTime * 1.9 + ph) * 0.1 + gust * 0.22) * transformed.y * transformed.y;
+  transformed.x += bend; transformed.z += bend * 0.35;
+#endif`); };
+{
+  const segs = 4, H = [0, 0.32, 0.6, 0.84, 1], Wd = [0.075, 0.064, 0.045, 0.024, 0.002], pos = [], col = [], nor = [], idx = [];
+  for (let i = 0; i <= segs; i++) { const y = H[i], z = y * y * 0.18, c = 0.55 + 0.6 * y; for (const s of [-1, 1]) { pos.push(s * Wd[i] / 2, y, z); col.push(c, c, c * 0.92); nor.push(0, 0.85, 0.5); } if (i < segs) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } }
+  const bg = new THREE.BufferGeometry(); bg.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); bg.setAttribute("color", new THREE.Float32BufferAttribute(col, 3)); bg.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3)); bg.setIndex(idx);
+  const NB = LOW ? 11000 : 30000, inst = new THREE.InstancedMesh(bg, grassMat, NB), m = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), cc = new THREE.Color(); let n = 0, guard = 0;
+  while (n < NB && guard++ < NB * 6) {
+    const wide = rnd() < 0.42, x = (rnd() - 0.5) * (wide ? 92 : 30), z = -15 + rnd() * 26;
+    if (Math.abs(x - pathX(z)) < 1.25 && z > -12.5) continue; if (Math.hypot(x - POND.x, (z - POND.z) * 1.15) < POND.r + 0.2) continue;
+    const dens = fbm2(x * 0.15, z * 0.15); if (rnd() > 0.35 + dens) continue;
+    p.set(x, hill(x, z) - 0.02, z); q.setFromEuler(new THREE.Euler(0, rnd() * 6.28, (rnd() - 0.5) * 0.35));
+    const mid = Math.abs(x) < 14 && z > -8.5 ? 0.6 : 1, tall = (0.26 + rnd() * 0.42 + dens * 0.3) * mid; sc.set(1 + rnd() * 0.5, tall, 1); m.compose(p, q, sc); inst.setMatrixAt(n, m);
+    const v = 0.82 + rnd() * 0.3; cc.setRGB(v * (0.95 + rnd() * 0.1), v, v * (0.9 + rnd() * 0.1)); inst.setColorAt(n, cc); n++;
+  }
+  inst.count = n; inst.receiveShadow = true; inst.frustumCulled = false; scene.add(inst);
+}
+
+// ================================================================ 눈 덮임: 위를 향한 면부터 하얗게
+const snowU = { value: 0 };
+function snowify(mat, strength) { mat.onBeforeCompile = (sh) => { sh.uniforms.uSnow = snowU; sh.vertexShader = "varying vec3 vWN;\n" + sh.vertexShader.replace("#include <beginnormal_vertex>", "#include <beginnormal_vertex>\n vWN = normalize(mat3(modelMatrix) * objectNormal);"); sh.fragmentShader = "uniform float uSnow; varying vec3 vWN;\n" + sh.fragmentShader.replace("#include <color_fragment>", `#include <color_fragment>\n diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.96, 1.0), uSnow * ${strength.toFixed(2)} * smoothstep(0.25, 0.7, vWN.y));`); }; return mat; }
+const shadowed = (o) => { o.castShadow = true; o.receiveShadow = true; return o; };
+const std = (hex, rough, extra) => new THREE.MeshStandardMaterial(Object.assign({ color: L(hex), roughness: rough === undefined ? 0.85 : rough, metalness: 0 }, extra || {}));
+const canvasTex = (w, h, draw, rep) => { const c = document.createElement("canvas"); c.width = w; c.height = h; draw(c.getContext("2d"), w, h); const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; if (rep) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); } return t; };
+const blocked = []; // 동물이 들어가지 않을 자리 [x, z, 반지름]
+
+// ================================================================ 나무: 뭉게뭉게한 잎 덩어리, 바람에 살랑
+const leafMats = [0, 1, 2].map(() => snowify(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, vertexColors: true }), 1.0));
+leafMats.forEach((m) => { const prev = m.onBeforeCompile; m.onBeforeCompile = (sh) => { prev(sh); sh.uniforms.uTime = uTime; sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n vec4 wp0 = modelMatrix * vec4(transformed, 1.0); transformed.x += sin(uTime * 1.4 + wp0.x * 0.3 + wp0.z * 0.2) * 0.05 * max(transformed.y + 1.0, 0.0);"); }; });
+const pineMat = snowify(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, vertexColors: true }), 1.15);
+const barkMat = std(0x6b4a30, 0.95);
+function blobGeo(r, seed) {
+  const g = new THREE.SphereGeometry(r, 28, 18), p = g.attributes.position, col = new Float32Array(p.count * 3), v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); const n = v.clone().normalize(), d = 1 + (vnoise(n.x * 2.6 + seed, n.y * 2.6 + n.z * 1.7) - 0.5) * 0.36 + (vnoise(n.x * 6 + seed * 3, n.z * 6 + n.y * 2) - 0.5) * 0.12; v.multiplyScalar(d); p.setXYZ(i, v.x, v.y, v.z); const sh = 0.58 + 0.55 * smooth(-r, r, v.y) + (vnoise(n.x * 5 + seed, n.y * 5) - 0.5) * 0.12; col[i * 3] = sh; col[i * 3 + 1] = sh; col[i * 3 + 2] = sh * 0.95; }
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+}
+function tree(x, z, s, variant, block) {
+  const g = new THREE.Group(), y0 = hill(x, z);
+  const trunk = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.3 * s, 2.4 * s, 8), barkMat)); trunk.position.y = 1.2 * s; g.add(trunk);
+  const br = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.07 * s, 0.12 * s, 1.2 * s, 6), barkMat)); br.position.set(0.32 * s, 2.1 * s, 0); br.rotation.z = -0.7; g.add(br);
+  const n = 4 + ((rnd() * 3) | 0);
+  for (let i = 0; i < n; i++) { const a = (i / n) * 6.28 + rnd(), rr = (0.9 + rnd() * 0.5) * s, b = shadowed(new THREE.Mesh(blobGeo(rr, rnd() * 50), leafMats[variant])); b.position.set(Math.cos(a) * 0.8 * s * (i ? 1 : 0), 2.9 * s + rnd() * 0.9 * s + (i ? 0 : 0.6 * s), Math.sin(a) * 0.8 * s * (i ? 1 : 0)); g.add(b); }
+  g.position.set(x, y0, z); g.rotation.y = rnd() * 6.28; scene.add(g); if (block) blocked.push([x, z, 1.2 * s]);
+}
+function pine(x, z, s) {
+  const g = new THREE.Group(); const tr = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.2 * s, 1.4 * s, 6), barkMat)); tr.position.y = 0.7 * s; g.add(tr);
+  for (let i = 0; i < 4; i++) { const r = (1.5 - i * 0.3) * s, h = (2.0 - i * 0.25) * s, cg = new THREE.ConeGeometry(r, h, 9, 2), p = cg.attributes.position, col = new Float32Array(p.count * 3);
+    for (let k = 0; k < p.count; k++) { const yy = p.getY(k) / h + 0.5, sh = 0.55 + 0.6 * yy; col[k * 3] = sh; col[k * 3 + 1] = sh; col[k * 3 + 2] = sh; if (yy < 0.05) { p.setX(k, p.getX(k) * (1 + (vnoise(k, i) - 0.5) * 0.2)); } }
+    cg.setAttribute("color", new THREE.BufferAttribute(col, 3)); cg.computeVertexNormals(); const c = shadowed(new THREE.Mesh(cg, pineMat)); c.position.y = (1.6 + i * 0.95) * s; c.rotation.y = rnd() * 3; g.add(c); }
+  g.position.set(x, hill(x, z), z); scene.add(g);
+}
+// 울타리 뒤 숲, 양옆, 먼 언덕
+for (let i = 0; i < 26; i++) { const x = -46 + i * 3.7 + (rnd() - 0.5) * 2.2, z = -14 - rnd() * 9; if (Math.abs(x + 9) < 5 && z > -18) continue; if (Math.abs(x - 10.5) < 3 && z > -19) continue; rnd() < 0.62 ? tree(x, z, 1.0 + rnd() * 0.55, (rnd() * 3) | 0) : pine(x, z, 1.1 + rnd() * 0.6); }
+for (let i = 0; i < 34; i++) { const x = -90 + rnd() * 180, z = -26 - rnd() * 26; rnd() < 0.5 ? pine(x, z, 1.3 + rnd() * 0.9) : tree(x, z, 1.3 + rnd() * 0.7, (rnd() * 3) | 0); }
+[[-33, -3, 1.25, 0], [-36, 6, 1.4, 2], [-29, 9.5, 1.1, 1], [33, -1, 1.3, 1], [36.5, 7, 1.45, 0], [29.5, 10.5, 1.0, 2], [-25.5, -7, 1.15, 1], [26, -7.5, 1.2, 2]].forEach(([x, z, s, v]) => tree(x, z, s, v, true));
+
+// ================================================================ 헛간, 사일로, 풍차, 울타리, 소품
+const barnTex = canvasTex(256, 256, (x, w, h) => { x.fillStyle = "#a8382a"; x.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) { x.fillStyle = `rgba(0,0,0,${0.05 + (i % 3) * 0.04})`; x.fillRect(i * 16, 0, 2, h); x.fillStyle = `rgba(255,255,255,${0.03 + ((i * 7) % 5) * 0.012})`; x.fillRect(i * 16 + 2, 0, 14, h); } }, [2, 1]);
+const winMat = new THREE.MeshStandardMaterial({ color: L(0x2a2016), emissive: L(0xffb357), emissiveIntensity: 0, roughness: 0.6 });
+const trimMat = std(0xf3ede2, 0.7), roofMat = snowify(std(0x3b2f2f, 0.8), 1.2), woodMat = std(0x8a6240, 0.9), stoneMat = std(0xb9b3a8, 0.95);
+{
+  const g = new THREE.Group(), W = 6.2, H = 3.6, D = 5;
+  const body = shadowed(new THREE.Mesh(new THREE.BoxGeometry(W, H, D), new THREE.MeshStandardMaterial({ map: barnTex, roughness: 0.85 }))); body.position.y = H / 2; g.add(body);
+  const gable = new THREE.Shape(); gable.moveTo(-W / 2 - 0.1, 0); gable.lineTo(-W / 2 + 0.6, 1.5); gable.lineTo(0, 2.3); gable.lineTo(W / 2 - 0.6, 1.5); gable.lineTo(W / 2 + 0.1, 0); gable.lineTo(-W / 2 - 0.1, 0);
+  const gb = shadowed(new THREE.Mesh(new THREE.ExtrudeGeometry(gable, { depth: D, bevelEnabled: false }), new THREE.MeshStandardMaterial({ map: barnTex, roughness: 0.85 }))); gb.position.set(0, H, -D / 2); g.add(gb);
+  const roofSeg = (x0, y0, x1, y1) => { const len = Math.hypot(x1 - x0, y1 - y0), r = shadowed(new THREE.Mesh(new THREE.BoxGeometry(len + 0.25, 0.16, D + 0.7), roofMat)); r.position.set((x0 + x1) / 2, H + (y0 + y1) / 2 + 0.08, 0); r.rotation.z = Math.atan2(y1 - y0, x1 - x0); g.add(r); };
+  roofSeg(-W / 2 - 0.25, -0.05, -W / 2 + 0.6, 1.5); roofSeg(-W / 2 + 0.6, 1.5, 0, 2.3); roofSeg(0, 2.3, W / 2 - 0.6, 1.5); roofSeg(W / 2 - 0.6, 1.5, W / 2 + 0.25, -0.05);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.4, 0.08), std(0x8e2f24, 0.8)); door.position.set(0, 1.2, D / 2 + 0.03); g.add(door);
+  const bar = (w, h, x, y, rz) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.1), trimMat); b.position.set(x, y, D / 2 + 0.09); b.rotation.z = rz || 0; g.add(b); };
+  bar(2.4, 0.16, 0, 2.42); bar(0.16, 2.5, -1.12, 1.2); bar(0.16, 2.5, 1.12, 1.2); bar(3.1, 0.13, 0, 1.2, 0.83); bar(3.1, 0.13, 0, 1.2, -0.83); bar(W + 0.1, 0.14, 0, 0.07); bar(0.14, H, -W / 2 + 0.04, H / 2); bar(0.14, H, W / 2 - 0.04, H / 2);
+  const loft = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.0, 0.08), winMat); loft.position.set(0, H + 0.9, D / 2 + 0.03); g.add(loft); bar(1.3, 0.12, 0, H + 1.45); bar(1.3, 0.12, 0, H + 0.35);
+  for (const sx of [-1, 1]) { const w = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.9, 0.9), winMat); w.position.set(sx * (W / 2 + 0.03), 1.9, 0.6); g.add(w); }
+  const lampMesh = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8), new THREE.MeshStandardMaterial({ color: 0x222222, emissive: L(0xffc070), emissiveIntensity: 0 })); lampMesh.position.set(0, 2.85, D / 2 + 0.3); g.add(lampMesh); g.userData.lampMesh = lampMesh;
+  g.position.set(-9, 0, -14.5); g.rotation.y = 0.28; scene.add(g);
+  const lp = lamp(0, 0, 0, 7); lp.position.copy(lampMesh.getWorldPosition(new THREE.Vector3())); lp.position.z += 0.6;
+  window.__barnLamp = lampMesh;
+  // 사일로
+  const silo = new THREE.Group(); const sc = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 6.2, 20), std(0xd8d2c4, 0.75))); sc.position.y = 3.1; silo.add(sc);
+  const dome = shadowed(new THREE.Mesh(new THREE.SphereGeometry(1.3, 20, 10, 0, 6.29, 0, 1.57), roofMat)); dome.position.y = 6.2; silo.add(dome);
+  for (let i = 0; i < 4; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(1.27, 0.05, 6, 24), std(0x8a8478, 0.6)); r.rotation.x = Math.PI / 2; r.position.y = 1.2 + i * 1.5; silo.add(r); }
+  silo.position.set(-13.8, 0, -16); scene.add(silo);
+}
+const windmill = new THREE.Group(); let blades;
+{
+  const tw = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.6, 7.5, 8), snowify(std(0xefe7da, 0.85), 0.3))); tw.position.y = 3.75; windmill.add(tw);
+  const cap = shadowed(new THREE.Mesh(new THREE.ConeGeometry(1.35, 1.6, 8), roofMat)); cap.position.y = 8.3; windmill.add(cap);
+  const dr = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.4, 0.1), std(0x6a4a33, 0.8)); dr.position.set(0, 0.7, 1.52); dr.rotation.x = -0.08; windmill.add(dr);
+  const wm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.6, 0.1), winMat); wm.position.set(0, 4.6, 1.22); wm.rotation.x = -0.08; windmill.add(wm);
+  blades = new THREE.Group(); blades.position.set(0, 7.6, 1.3);
+  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.4, 10), woodMat); hub.rotation.x = Math.PI / 2; blades.add(hub);
+  for (let i = 0; i < 4; i++) { const arm = new THREE.Group(); arm.rotation.z = (i * Math.PI) / 2; const sp = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.14, 4.4, 0.1), woodMat)); sp.position.y = 2.3; arm.add(sp);
+    const sail = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.85, 3.4, 0.04), std(0xf4efe4, 0.9, { side: THREE.DoubleSide }))); sail.position.set(0.48, 2.6, 0); arm.add(sail); blades.add(arm); }
+  windmill.add(blades); windmill.position.set(11, 0, -17.5); windmill.rotation.y = -0.25; scene.add(windmill);
+}
+const lanternMeshes = [];
+const fenceMat = snowify(std(0x9b7652, 0.9), 0.8);
+{
+  const gate = pathX(-9.6);
+  for (let x = -40; x <= 40; x += 2.2) { if (Math.abs(x - gate) < 1.6) continue; const pz = -9.6 + Math.sin(x * 0.2) * 0.25, y = hill(x, pz); const p = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.2, 0.18), fenceMat)); p.position.set(x, y + 0.6, pz); p.rotation.y = (rnd() - 0.5) * 0.1; scene.add(p);
+    if (Math.abs(x + 2.2 - gate) < 1.6 || x + 2.2 > 40) continue; const nz = -9.6 + Math.sin((x + 2.2) * 0.2) * 0.25;
+    for (const yy of [0.5, 0.95]) { const r = shadowed(new THREE.Mesh(new THREE.BoxGeometry(2.25, 0.1, 0.07), fenceMat)); r.position.set(x + 1.1, y + yy, (pz + nz) / 2); r.rotation.y = -Math.atan2(nz - pz, 2.2); scene.add(r); } }
+  // 대문 양쪽 등불
+  for (const sx of [-1.7, 1.7]) { const post = shadowed(new THREE.Mesh(new THREE.BoxGeometry(0.24, 2.1, 0.24), fenceMat)); post.position.set(gate + sx, 1.05, -9.6); scene.add(post);
+    const glass = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.38, 0.3), new THREE.MeshStandardMaterial({ color: 0x332a20, emissive: L(0xffb45c), emissiveIntensity: 0 })); glass.position.set(gate + sx, 2.3, -9.6); scene.add(glass); lanternMeshes.push(glass);
+    const top = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 4), std(0x2b2b2b, 0.5)); top.position.set(gate + sx, 2.58, -9.6); top.rotation.y = Math.PI / 4; scene.add(top); lamp(gate + sx, 2.3, -9.1, 11); }
+}
+// 건초 더미, 수레, 돌
+const hayTex = canvasTex(256, 128, (x, w, h) => { x.fillStyle = "#d9b45a"; x.fillRect(0, 0, w, h); for (let i = 0; i < 900; i++) { x.strokeStyle = `rgba(${120 + rnd() * 80},${90 + rnd() * 60},20,${0.25 + rnd() * 0.3})`; x.beginPath(); const sx = rnd() * w, sy = rnd() * h; x.moveTo(sx, sy); x.lineTo(sx + (rnd() - 0.5) * 30, sy + (rnd() - 0.5) * 6); x.stroke(); } });
+const hayMat = snowify(new THREE.MeshStandardMaterial({ map: hayTex, roughness: 1 }), 1.0);
+[[-5.8, -7.4, 0.3], [-4.3, -7.9, 1.2], [8.2, -6.6, -0.4], [23.5, 3.2, 0.9], [-24.5, 8.5, 0.2]].forEach(([x, z, r]) => { const b = shadowed(new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.15, 22), hayMat)); b.rotation.z = Math.PI / 2; b.rotation.y = r; b.position.set(x, hill(x, z) + 0.72, z); scene.add(b); blocked.push([x, z, 1.1]); });
+{ const cart = new THREE.Group(); const bed = shadowed(new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 1.3), woodMat)); bed.position.y = 0.95; cart.add(bed);
+  for (const sx of [-1, 1]) { const wh = shadowed(new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.08, 8, 18), std(0x5a3d25, 0.8))); wh.position.set(0.2, 0.62, sx * 0.72); cart.add(wh); const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 1.05, 6), woodMat); sp.position.copy(wh.position); cart.add(sp); }
+  const shaft = shadowed(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.08), woodMat)); shaft.position.set(-1.8, 0.75, 0); shaft.rotation.z = -0.25; cart.add(shaft);
+  const load = shadowed(new THREE.Mesh(new THREE.SphereGeometry(0.75, 14, 10), hayMat)); load.scale.set(1.35, 0.55, 0.85); load.position.y = 1.3; cart.add(load);
+  cart.position.set(16, hill(16, -5.5), -5.5); cart.rotation.y = 0.5; scene.add(cart); blocked.push([16, -5.5, 2.0]); }
+{ const rg = new THREE.DodecahedronGeometry(0.5, 0); for (let i = 0; i < 26; i++) { const a = (i / 26) * 6.28, x = POND.x + Math.cos(a) * (POND.r + 0.2) * (1 + (rnd() - 0.5) * 0.12), z = POND.z + Math.sin(a) * (POND.r + 0.2) / 1.15; const r = shadowed(new THREE.Mesh(rg, stoneMat)); r.scale.set(0.5 + rnd() * 0.6, 0.35 + rnd() * 0.35, 0.5 + rnd() * 0.6); r.position.set(x, hill(x, z) + 0.05, z); r.rotation.set(rnd(), rnd() * 6, rnd()); scene.add(r); }
+  for (let i = 0; i < 9; i++) { const x = -38 + rnd() * 76, z = -8 + rnd() * 20; if (Math.abs(x) < 12) continue; const r = shadowed(new THREE.Mesh(rg, stoneMat)); const s = 0.6 + rnd() * 0.9; r.scale.set(s, s * 0.6, s); r.position.set(x, hill(x, z) + 0.1, z); r.rotation.set(rnd(), rnd() * 6, rnd()); scene.add(r); blocked.push([x, z, s * 0.7]); } }
+blocked.push([POND.x, POND.z, POND.r + 0.9]);
+
+// ================================================================ 연못: 하늘을 비추고 잔물결과 반짝임
+const waterU = { time: uTime, deep: { value: new THREE.Color() }, skyC: { value: cur.mid }, sunC: { value: cur.disk }, sunDir: { value: cur.sunDir } };
+{
+  const wm = new THREE.ShaderMaterial({ transparent: true, fog: true, uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, {}]),
+    vertexShader: "varying vec3 vW; varying vec2 vUv;\n#include <fog_pars_vertex>\nvoid main(){ vUv = uv; vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; vec4 mvPosition = viewMatrix * w; gl_Position = projectionMatrix * mvPosition;\n#include <fog_vertex>\n}",
+    fragmentShader: `uniform float time; uniform vec3 deep, skyC, sunC, sunDir; varying vec3 vW; varying vec2 vUv;
+    #include <fog_pars_fragment>
+    ${NOISE_GLSL}
+    void main(){ vec3 V = normalize(cameraPosition - vW); vec2 p = vW.xz * 1.6; float n1 = fbm(p + vec2(time * 0.25, time * 0.1)), n2 = fbm(p * 1.7 - vec2(time * 0.18, -time * 0.22));
+      vec3 N = normalize(vec3((n1 - 0.5) * 0.35, 1.0, (n2 - 0.5) * 0.35)); float fr = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+      vec3 c = mix(deep, skyC * 1.05, 0.25 + fr * 0.75); vec3 R = reflect(-V, N); float sp = pow(max(dot(R, sunDir), 0.0), 220.0);
+      c += sunC * sp * 6.0; c += sunC * step(0.985, vn(p * 6.0 + time * 0.8)) * 0.9 * max(sunDir.y, 0.2);
+      float edge = smoothstep(0.5, 0.47, length(vUv - 0.5)); gl_FragColor = vec4(c, 0.92 * edge);
+      #include <fog_fragment>
+    }` });
+  Object.assign(wm.uniforms, waterU);
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(POND.r * 2.3, POND.r * 2.3 / 1.15), wm); water.rotation.x = -Math.PI / 2; water.position.set(POND.x, -0.12, POND.z); scene.add(water);
+  waterU.deep.value = L(0x23524f);
+  const padM = std(0x4f8f3a, 0.6, { side: THREE.DoubleSide }); for (let i = 0; i < 9; i++) { const a = rnd() * 6.28, r = rnd() * POND.r * 0.75; const pad = new THREE.Mesh(new THREE.CircleGeometry(0.28 + rnd() * 0.2, 16, 0.3, 5.9), padM); pad.rotation.x = -Math.PI / 2; pad.rotation.z = rnd() * 6; pad.position.set(POND.x + Math.cos(a) * r, -0.09, POND.z + Math.sin(a) * r / 1.15); scene.add(pad);
+    if (i % 3 === 0) { const fl = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.16, 6), new THREE.MeshStandardMaterial({ color: L(0xffb3cf), emissive: L(0xff9ec0), emissiveIntensity: 0.15 })); fl.position.copy(pad.position); fl.position.y += 0.08; fl.rotation.x = Math.PI; scene.add(fl); } }
+  const reedM = std(0x5f7d3a, 0.8); for (let i = 0; i < 40; i++) { const a = rnd() * 6.28, x = POND.x + Math.cos(a) * (POND.r - 0.2), z = POND.z + Math.sin(a) * (POND.r - 0.2) / 1.15; if (rnd() < 0.5 && Math.sin(a) > 0) continue; const h = 0.8 + rnd() * 1.1; const r = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.03, h, 4), reedM); r.position.set(x, h / 2 - 0.1, z); r.rotation.z = (rnd() - 0.5) * 0.3; scene.add(r); if (rnd() < 0.4) { const top = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 6), std(0x6b4128, 0.8)); top.position.set(x, h - 0.05, z); scene.add(top); } }
+}
+
+// ================================================================ 꽃과 해바라기
+const flowerMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, emissive: 0xffffff, emissiveIntensity: 0.0 });
+let flowers; const flowerSlots = [];
+{
+  const fg = new THREE.IcosahedronGeometry(0.085, 1); fg.scale(1, 0.7, 1); const NF = LOW ? 900 : 2000; flowers = new THREE.InstancedMesh(fg, flowerMat, NF); const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(); let n = 0, guard = 0;
+  while (n < NF && guard++ < NF * 30) { const x = (rnd() - 0.5) * 84, z = -14 + rnd() * 30; const patch = fbm2(x * 0.12 + 40, z * 0.12); if (patch < 0.56 || rnd() > (patch - 0.5) * 3) continue; if (Math.abs(x - pathX(z)) < 1.3) continue; if (Math.hypot(x - POND.x, (z - POND.z) * 1.15) < POND.r + 0.4) continue;
+    const h = 0.28 + rnd() * 0.42; m.compose(new THREE.Vector3(x, hill(x, z) + h, z), q, s.set(1, 1, 1).multiplyScalar(0.8 + rnd() * 0.6)); flowers.setMatrixAt(n, m); flowerSlots.push(rnd()); n++; }
+  flowers.count = n; flowers.castShadow = false; flowers.receiveShadow = true; flowers.frustumCulled = false; flowers.setColorAt(0, new THREE.Color()); scene.add(flowers);
+}
+function paintFlowers() { const pal = SEASONS[seasonKey].flowers, c = new THREE.Color(); flowers.visible = pal.length > 0; if (!pal.length) return; for (let i = 0; i < flowers.count; i++) { c.copy(L(pal[Math.floor(flowerSlots[i] * pal.length) % pal.length])); flowers.setColorAt(i, c); } flowers.instanceColor.needsUpdate = true; }
+const sunflowers = new THREE.Group();
+{
+  const headTex = canvasTex(128, 128, (x, w) => { x.translate(64, 64); for (let i = 0; i < 22; i++) { x.rotate((Math.PI * 2) / 22); x.fillStyle = i % 2 ? "#ffc928" : "#f5b015"; x.beginPath(); x.ellipse(0, -40, 9, 24, 0, 0, 7); x.fill(); } x.fillStyle = "#5a3412"; x.beginPath(); x.arc(0, 0, 25, 0, 7); x.fill(); x.fillStyle = "rgba(0,0,0,0.25)"; for (let i = 0; i < 60; i++) { x.beginPath(); x.arc((rnd() - 0.5) * 36, (rnd() - 0.5) * 36, 1.6, 0, 7); x.fill(); } });
+  const hm = new THREE.MeshStandardMaterial({ map: headTex, alphaTest: 0.5, transparent: false, side: THREE.DoubleSide, roughness: 0.8 }), stm = std(0x4f7d2f, 0.8);
+  for (let i = 0; i < 26; i++) { const x = 18 + (rnd() - 0.5) * 9, z = -1.5 + (rnd() - 0.5) * 5.5, h = 1.4 + rnd() * 0.9; const st = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, h, 5), stm); st.position.set(x, h / 2, z); sunflowers.add(st);
+    const hd = shadowed(new THREE.Mesh(new THREE.CircleGeometry(0.42 + rnd() * 0.12, 20), hm)); hd.position.set(x, h + 0.05, z + 0.05); hd.rotation.set(-0.25, (rnd() - 0.5) * 0.6, rnd()); sunflowers.add(hd);
+    const lf = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 4), stm); lf.scale.set(1.3, 0.2, 0.6); lf.position.set(x + 0.15, h * 0.5, z); lf.rotation.z = -0.5; sunflowers.add(lf); }
+  scene.add(sunflowers); blocked.push([18, -1.5, 4.5]);
+}
+
+// ================================================================ 공중의 입자: 계절 입자, 반딧불, 나비, 새
+const glowTex = canvasTex(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, "rgba(255,255,255,1)"); g.addColorStop(0.25, "rgba(255,255,255,0.8)"); g.addColorStop(1, "rgba(255,255,255,0)"); x.fillStyle = g; x.fillRect(0, 0, 64, 64); });
+glowTex.encoding = THREE.LinearEncoding;
+const PN = LOW ? 260 : 520, pPos = new Float32Array(PN * 3), pSeed = new Float32Array(PN);
+for (let i = 0; i < PN; i++) { pPos[i * 3] = (rnd() - 0.5) * 80; pPos[i * 3 + 1] = rnd() * 14; pPos[i * 3 + 2] = -16 + rnd() * 30; pSeed[i] = rnd() * 100; }
+const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ size: 0.2, map: glowTex, transparent: true, opacity: 0.9, depthWrite: false, color: 0xffffff });
+const seasonPts = new THREE.Points(pGeo, pMat); seasonPts.frustumCulled = false; scene.add(seasonPts);
+// 반딧불: 밤에만 깜빡이며 떠다닌다
+const FN = LOW ? 120 : 240, fPos = new Float32Array(FN * 3), fPh = new Float32Array(FN);
+for (let i = 0; i < FN; i++) { fPos[i * 3] = (rnd() - 0.5) * 70; fPos[i * 3 + 1] = 0.3 + rnd() * 3; fPos[i * 3 + 2] = -13 + rnd() * 24; fPh[i] = rnd() * 6.28; }
+const fGeo = new THREE.BufferGeometry(); fGeo.setAttribute("position", new THREE.BufferAttribute(fPos, 3)); fGeo.setAttribute("ph", new THREE.BufferAttribute(fPh, 1));
+const fireU = { time: uTime, amt: { value: 0 }, tex: { value: glowTex }, scale: { value: 300 } };
+const fireflies = new THREE.Points(fGeo, new THREE.ShaderMaterial({ uniforms: fireU, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  vertexShader: "uniform float time, scale; attribute float ph; varying float vA; void main(){ vec3 p = position; p.x += sin(time * 0.4 + ph * 3.0) * 1.2; p.y += sin(time * 0.7 + ph) * 0.4; p.z += cos(time * 0.3 + ph * 2.0) * 1.2; vec4 mv = modelViewMatrix * vec4(p, 1.0); vA = pow(0.5 + 0.5 * sin(time * 2.2 + ph * 5.0), 3.0); gl_PointSize = scale * 0.16 / -mv.z; gl_Position = projectionMatrix * mv; }",
+  fragmentShader: "uniform sampler2D tex; uniform float amt; varying float vA; void main(){ vec4 t = texture2D(tex, gl_PointCoord); gl_FragColor = vec4(vec3(1.6, 1.5, 0.55) * t.a * vA * amt, 1.0); }" }));
+fireflies.frustumCulled = false; scene.add(fireflies);
+// 나비
+const butterflies = [];
+{ const wingTex = (c1, c2) => canvasTex(64, 64, (x) => { x.fillStyle = c1; x.beginPath(); x.ellipse(36, 22, 24, 18, 0.5, 0, 7); x.fill(); x.beginPath(); x.ellipse(30, 48, 14, 12, -0.3, 0, 7); x.fill(); x.fillStyle = c2; x.beginPath(); x.arc(42, 20, 6, 0, 7); x.fill(); });
+  const pals = [["#ffd23f", "#6b3f12"], ["#9fd0ff", "#1f4b7a"], ["#ffffff", "#e0a0c0"], ["#ff9a5a", "#4a2b12"]];
+  for (let i = 0; i < 8; i++) { const [a, b] = pals[i % 4], m = new THREE.MeshStandardMaterial({ map: wingTex(a, b), transparent: true, alphaTest: 0.3, side: THREE.DoubleSide, roughness: 0.6 }), g = new THREE.Group(), wings = [];
+    for (const s of [-1, 1]) { const pv = new THREE.Group(), w = new THREE.Mesh(new THREE.PlaneGeometry(0.32, 0.32), m); w.position.x = s * 0.16; w.scale.x = s; pv.add(w); g.add(pv); wings.push(pv); }
+    g.scale.setScalar(0.9); scene.add(g); butterflies.push({ g, wings, cx: (rnd() - 0.5) * 30, cz: -6 + rnd() * 12, ph: rnd() * 6.28, r: 1.5 + rnd() * 2.5 }); } }
+// 멀리 나는 새
+const birds = [];
+{ const bm = new THREE.MeshBasicMaterial({ color: 0x2a2a35, side: THREE.DoubleSide, fog: false });
+  for (let i = 0; i < 7; i++) { const g = new THREE.Group(), ws = []; for (const s of [-1, 1]) { const pv = new THREE.Group(), geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0.25, 0, 0, -0.25, s * 1.3, 0, 0.1], 3)); pv.add(new THREE.Mesh(geo, bm)); g.add(pv); ws.push(pv); }
+    scene.add(g); birds.push({ g, ws, x: -120 + rnd() * 240, y: 26 + rnd() * 14, z: -90 - rnd() * 40, sp: 5 + rnd() * 3, ph: rnd() * 6 }); } }
+
+// ================================================================ 효과: 하트, Z, 반짝이, 빛기둥
+const heartTex = canvasTex(64, 64, (x) => { x.fillStyle = "#ff6f91"; x.beginPath(); x.moveTo(32, 54); x.bezierCurveTo(4, 34, 8, 8, 32, 20); x.bezierCurveTo(56, 8, 60, 34, 32, 54); x.fill(); x.fillStyle = "rgba(255,255,255,0.7)"; x.beginPath(); x.ellipse(22, 22, 5, 3, -0.6, 0, 7); x.fill(); });
+const zTex = canvasTex(64, 64, (x) => { x.font = "900 48px sans-serif"; x.textAlign = "center"; x.textBaseline = "middle"; x.lineWidth = 8; x.strokeStyle = "#33415c"; x.strokeText("Z", 32, 34); x.fillStyle = "#ffffff"; x.fillText("Z", 32, 34); });
+const fx = [];
+function emit(kind, pos, n) {
+  for (let i = 0; i < (n || 1); i++) {
+    const glow = kind === "spark", mat = new THREE.SpriteMaterial({ map: kind === "heart" ? heartTex : kind === "z" ? zTex : glowTex, transparent: true, depthWrite: false, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending, color: glow ? new THREE.Color(2.2, 1.9, 1.2) : 0xffffff });
+    const s = new THREE.Sprite(mat); s.position.copy(pos); scene.add(s);
+    const a = rnd() * 6.28, sp = glow ? 1.5 + rnd() * 3 : 0.3;
+    fx.push({ s, kind, life: 0, max: glow ? 0.8 + rnd() * 0.8 : kind === "z" ? 2.2 : 1.6, v: new THREE.Vector3(Math.cos(a) * sp * (glow ? 1 : 0.4), glow ? 1 + rnd() * 3 : 0.9, Math.sin(a) * sp * (glow ? 1 : 0.4)), size: glow ? 0.18 + rnd() * 0.22 : kind === "z" ? 0.42 : 0.5 });
+  }
+}
+function stepFx(dt) { for (let i = fx.length - 1; i >= 0; i--) { const f = fx[i]; f.life += dt; const k = f.life / f.max; if (k >= 1) { scene.remove(f.s); f.s.material.dispose(); fx.splice(i, 1); continue; }
+  f.s.position.addScaledVector(f.v, dt); if (f.kind === "spark") f.v.y -= 2.2 * dt; if (f.kind === "z") f.s.position.x += Math.sin(f.life * 4) * dt * 0.4;
+  const sz = f.size * (f.kind === "spark" ? 1 - k * 0.6 : Math.min(1, k * 5)); f.s.scale.set(sz, sz, 1); f.s.material.opacity = f.kind === "spark" ? 1 - k : Math.min(1, (1 - k) * 2.5); } }
+const beamMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { time: uTime, a: { value: 1 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: "uniform float time, a; varying vec2 vUv; void main(){ float s = 0.55 + 0.45 * sin(vUv.x * 40.0 + time * 6.0); float f = pow(1.0 - vUv.y, 1.6) * smoothstep(0.0, 0.05, vUv.y); gl_FragColor = vec4(vec3(1.5, 1.3, 0.85) * f * s * a, 1.0); }" });
+const beams = [];
+function beam(x, z) { const m = beamMat.clone(); m.uniforms.time = uTime; const b = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.25, 9, 24, 1, true), m); b.position.set(x, 4.5, z); scene.add(b); beams.push({ b, t: 0 });
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.45, 40), new THREE.MeshBasicMaterial({ color: new THREE.Color(2, 1.7, 1), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); ring.rotation.x = -Math.PI / 2; ring.position.set(x, 0.05, z); scene.add(ring); beams.push({ ring, t: 0 }); }
+function stepBeams(dt) { for (let i = beams.length - 1; i >= 0; i--) { const o = beams[i]; o.t += dt;
+  if (o.b) { const k = o.t / 1.8; o.b.material.uniforms.a.value = k < 0.15 ? k / 0.15 : Math.max(0, 1 - (k - 0.15) / 0.85); o.b.scale.set(1 - k * 0.5, 1, 1 - k * 0.5); if (k >= 1) { scene.remove(o.b); o.b.geometry.dispose(); o.b.material.dispose(); beams.splice(i, 1); } }
+  else { const k = o.t / 1.4; o.ring.scale.setScalar(1 + k * 7); o.ring.material.opacity = Math.max(0, 1 - k); if (k >= 1) { scene.remove(o.ring); o.ring.geometry.dispose(); o.ring.material.dispose(); beams.splice(i, 1); } } } }
+
+// ================================================================ 동물: 도안의 옆모습을 둥근 몸에 입힌다
+const SHAPES = TPL.SHAPES, KO = { cow: "소", pig: "돼지", dog: "강아지" };
+// 둥근 상자: 상자의 정점을 가장자리 쪽으로 모은 뒤 모서리를 공 모양으로 깎는다
+function roundedBox(w, h, d, r, seg) {
+  const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg), p = g.attributes.position, n = g.attributes.normal, hw = w / 2, hh = h / 2, hd = d / 2; r = Math.min(r, hw * 0.98, hh * 0.98, hd * 0.98);
+  const v = new THREE.Vector3(), c = new THREE.Vector3(), warp = (u, H) => H * Math.sin((u / H) * Math.PI / 2);
+  for (let i = 0; i < p.count; i++) { const x = warp(p.getX(i), hw), y = warp(p.getY(i), hh), z = warp(p.getZ(i), hd);
+    c.set(clamp(x, -hw + r, hw - r), clamp(y, -hh + r, hh - r), clamp(z, -hd + r, hd - r)); v.set(x, y, z).sub(c); const len = v.length() || 1; v.multiplyScalar(1 / len);
+    p.setXYZ(i, c.x + v.x * r, c.y + v.y * r, c.z + v.z * r); n.setXYZ(i, v.x, v.y, v.z); }
+  return g;
+}
+// 옆모습 그림을 비춘다. 옆을 향한 면은 그림 그대로, 위·아래·앞·뒤를 향한 면은 그림 가장자리 색을 잇는다.
+function projUV(g, r, full) {
+  const pos = g.attributes.position, nor = g.attributes.normal, uv = g.attributes.uv; g.computeBoundingBox(); const bb = g.boundingBox, sz = new THREE.Vector3(); bb.getSize(sz);
+  const IN = 7, x0 = r.x + IN, x1 = r.x + r.w - IN, yT = r.y + IN, yB = r.y + r.h - IN, dx = Math.min(28, (x1 - x0) * 0.32), dy = Math.min(28, (yB - yT) * 0.32);
+  for (let i = 0; i < pos.count; i++) {
+    if (full) { uv.setXY(i, (x0 + uv.getX(i) * (x1 - x0)) / AW, 1 - (yB - uv.getY(i) * (yB - yT)) / AH); continue; }
+    const fx = (pos.getX(i) - bb.min.x) / sz.x, fy = (pos.getY(i) - bb.min.y) / sz.y, fz = (pos.getZ(i) - bb.min.z) / sz.z, k = 1 - Math.abs(2 * fx - 1), ax = Math.abs(nor.getX(i)), ay = Math.abs(nor.getY(i)), az = Math.abs(nor.getZ(i));
+    let px = x0 + fz * (x1 - x0), py = yB - fy * (yB - yT);
+    if (ay > ax && ay >= az) py = nor.getY(i) > 0 ? yT + dy * k : yB - dy * k; else if (az > ax) px = nor.getZ(i) > 0 ? x1 - dx * k : x0 + dx * k;
+    uv.setXY(i, px / AW, 1 - py / AH);
+  }
+  return g;
+}
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0c0c0e, roughness: 0.12, metalness: 0.1 }), eyeHi = new THREE.MeshBasicMaterial({ color: 0xffffff }), noseMat = std(0x2a2224, 0.4), hornMat = std(0xf1e6d0, 0.5);
+const blobShadowTex = canvasTex(64, 64, (x) => { const g = x.createRadialGradient(32, 32, 2, 32, 32, 32); g.addColorStop(0, "rgba(0,0,0,0.55)"); g.addColorStop(1, "rgba(0,0,0,0)"); x.fillStyle = g; x.fillRect(0, 0, 64, 64); });
+function makeAnimal(kind, tex) {
+  const S = SHAPES[kind], LA = TPL.layout(kind), U = LA.uv, mat = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.55, metalness: 0, envMapIntensity: 0.75 }); mat.userData.env = 1;
+  const mesh = (geo, m) => shadowed(new THREE.Mesh(geo, m || mat));
+  const rb = (w, h, d, rect, full, rr, seg) => projUV(roundedBox(w, h, d, rr === undefined ? Math.min(w, h, d) * 0.3 : rr, seg || 8), rect, full);
+  const [bw, bh, bl] = S.body, [lw, lh] = S.leg, [hw, hh, hd] = S.head, [sw, sh2, sd, sy] = S.snout;
+  const root = new THREE.Group(), hip = new THREE.Group(), rig = new THREE.Group(); root.add(hip); hip.add(rig);
+  const hipPos = new THREE.Vector3(0, lh, -(bl / 2 - lw / 2 - 0.04)); hip.position.copy(hipPos); rig.position.copy(hipPos).negate();
+  const body = mesh(rb(bw, bh, bl, U.body, false, Math.min(bw, bh) * 0.34, 10)); body.position.y = lh + bh / 2; rig.add(body);
+  const cy = lh + bh * 0.72, cz = bl / 2 + hd * 0.28, neck = new THREE.Group(); neck.position.set(0, lh + bh * 0.8, bl / 2 - 0.1); rig.add(neck);
+  const head = new THREE.Group(); head.position.set(0, cy - neck.position.y, cz - neck.position.z); neck.add(head);
+  head.add(mesh(rb(hw, hh, hd, U.head, false, Math.min(hw, hh, hd) * 0.34, 10)));
+  const snout = mesh(rb(sw, sh2, sd + 0.04, U.snout, false, Math.min(sw, sh2, sd) * 0.4, 6)); snout.position.set(0, sy, hd / 2 + sd / 2 - 0.04); head.add(snout);
+  if (S.nose) { const n = mesh(roundedBox(0.18, 0.13, 0.1, 0.05, 4), noseMat); n.position.set(0, sy + sh2 * 0.28, hd / 2 + sd + 0.0); head.add(n); }
+  else for (const sg of [-1, 1]) { const n = mesh(new THREE.SphereGeometry(0.045, 10, 8), noseMat); n.scale.z = 0.5; n.position.set(sg * sw * 0.22, sy, hd / 2 + sd - 0.01); head.add(n); }
+  const eyes = new THREE.Group(); head.add(eyes);
+  for (const sg of [-1, 1]) { const e = new THREE.Group(); e.position.set(sg * (hw / 2 + 0.005), hh * 0.14, hd * 0.16); const ball = new THREE.Mesh(new THREE.SphereGeometry(0.085, 16, 12), eyeMat); ball.scale.x = 0.55; e.add(ball); const hi = new THREE.Mesh(new THREE.SphereGeometry(0.026, 8, 6), eyeHi); hi.position.set(sg * 0.04, 0.035, 0.03); e.add(hi); eyes.add(e); }
+  const ears = [];
+  for (const sg of [-1, 1]) { const pv = new THREE.Group(); let e;
+    if (S.ears === "side") { e = mesh(rb(0.38, 0.2, 0.1, U.ear, true, 0.045, 4)); e.position.x = sg * 0.19; pv.position.set(sg * hw / 2, hh * 0.3, -0.05); }
+    else if (S.ears === "top") { e = mesh(rb(0.3, 0.3, 0.08, U.ear, true, 0.035, 4)); e.position.y = 0.13; pv.position.set(sg * hw * 0.3, hh / 2 - 0.02, hd * 0.2); pv.rotation.x = 0.5; }
+    else { e = mesh(rb(0.1, 0.5, 0.36, U.ear, true, 0.045, 4)); e.position.y = -0.22; pv.position.set(sg * (hw / 2 + 0.04), hh * 0.42, -0.05); }
+    pv.add(e); head.add(pv); ears.push(pv);
+    if (S.horns) { const hn = mesh(new THREE.ConeGeometry(0.075, 0.3, 10), hornMat); hn.position.set(sg * hw * 0.32, hh / 2 + 0.12, -0.05); hn.rotation.z = -sg * 0.35; head.add(hn); } }
+  const legs = [];
+  for (const [sx, sz] of [[-1, 1], [1, 1], [-1, -1], [1, -1]]) { const pv = new THREE.Group(); pv.position.set(sx * (bw / 2 - lw / 2), lh, sz * (bl / 2 - lw / 2 - 0.04)); const l = mesh(rb(lw, lh + 0.08, lw, sz > 0 ? U.legF : U.legB, false, lw * 0.42, 6)); l.position.y = -lh / 2 + 0.02; pv.add(l); rig.add(pv); legs.push(pv); }
+  const [tw, tl, tr] = S.tail, tail = new THREE.Group(); tail.position.set(0, lh + bh * 0.8, -bl / 2 + 0.03); const tm = mesh(rb(tw, tl, tw, U.tail, true, tw * 0.45, 4)); tm.position.y = -tl / 2; tail.add(tm); rig.add(tail);
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: blobShadowTex, transparent: true, depthWrite: false })); shadow.rotation.x = -Math.PI / 2; shadow.renderOrder = 1; scene.add(shadow);
+  root.scale.setScalar(S.scale);
+  return { root, hip, rig, mat, tex, legs, neck, head, tail, ears, eyes, shadow, tailRest: -0.35 + tr, kind, size: [bw, bl] };
+}
+
+// ================================================================ 동작 목록
+// 새 동작은 여기에 하나 추가하면 아래쪽 동작 버튼과 동물들의 자동 행동에 바로 쓰인다.
+//   label: 버튼 이름 (없으면 버튼을 만들지 않음)  auto: 혼자 지낼 때 고를 확률 가중치  dur: 지속 시간 범위(초)
+//   start(c): 시작할 때 한 번  update(c, dt): 매 프레임. c.poseT 에 원하는 자세를 적으면 부드럽게 따라간다.
+const ACTIONS = {
+  walk:  { label: "걷기", auto: 5, dur: [5, 9], start(c) { c.speedMul = 1; newTarget(c); }, update(c, dt) { moveTo(c, dt); } },
+  run:   { label: "달리기", auto: 0.8, dur: [3, 4.5], start(c) { c.speedMul = 2.6; newTarget(c, 7); }, update(c, dt) { moveTo(c, dt); c.poseT.tailAmp = 0.7; c.poseT.ears = 1; } },
+  jump:  { label: "점프", auto: 0.5, dur: [1.4, 1.4], start(c) { if (c.y < 0.05) c.vy = 7.5; } },
+  sit:   { label: "앉기", auto: 1.2, dur: [4, 7], update(c) { c.poseT.sit = 1; c.poseT.headPitch = -0.15; } },
+  sleep: { label: "잠자기", auto: 0.5, dur: [7, 11], update(c) { c.poseT.lie = 1; c.poseT.eyes = 0.06; c.poseT.headPitch = 0.42; c.poseT.tailAmp = 0; if (c.actT > 1.2) every(c, "z", 1.2, () => emit("z", headTop(c))); } },
+  eat:   { label: "풀 뜯기", auto: 2, dur: [3.5, 6], update(c) { c.poseT.graze = 1; c.poseT.headPitch = Math.sin(c.actT * 9) * 0.07; } },
+  look:  { label: "두리번", auto: 1.5, dur: [3, 4.5], update(c) { c.poseT.headYaw = Math.sin(c.actT * 1.7) * 0.85; c.poseT.headPitch = -0.18; } },
+  dance: { label: "춤추기", auto: 0.4, dur: [3.6, 3.6], update(c, dt) { every(c, "hop", 0.6, () => { if (c.y < 0.05) c.vy = 4.2; emit("spark", headTop(c), 4); }); c.spin += dt * 4.2; c.poseT.headRoll = Math.sin(c.actT * 9) * 0.3; c.poseT.tailAmp = 0.9; c.poseT.lean = Math.sin(c.actT * 9) * 0.12; } },
+  happy: { label: "신나기", auto: 0.6, dur: [2.6, 3.4], update(c) { c.poseT.tailAmp = 1; c.poseT.tailSpd = 18; c.poseT.lean = Math.sin(c.actT * 11) * 0.07; c.poseT.ears = 1; every(c, "hop", 0.75, () => { if (c.y < 0.05) c.vy = 3.4; }); every(c, "heart", 0.9, () => emit("heart", headTop(c))); } },
+  greet: { label: "인사하기", auto: 0, dur: [7, 7], start(c) { c.friend = nearest(c); if (!c.friend) { setAct(c, "happy"); return; } }, update(c, dt) { greetUpdate(c, dt); } },
+  greeted: { auto: 0, dur: [4, 4], update(c) { const f = c.friend; if (f && !f.dying) faceTo(c, f.x, f.z); c.poseT.headPitch = c.actT > 0.4 && c.actT < 2.4 ? 0.35 + Math.sin(c.actT * 5) * 0.2 : 0; c.poseT.tailAmp = 0.8; } },
+};
+const AUTO = Object.entries(ACTIONS).filter(([, a]) => a.auto > 0);
+function every(c, key, period, fn) { const k = "_" + key; c[k] = (c[k] || 0) + 0; if (c.actT - (c[k + "t"] || -9) >= period) { c[k + "t"] = c.actT; fn(); } }
+function headTop(c) { const v = new THREE.Vector3(); c.head.getWorldPosition(v); v.y += 0.8 * SHAPES[c.kind].scale; return v; }
+function nearest(c) { let best = null, bd = 1e9; for (const o of chars) { if (o === c || o.dying || o.spawnT < 1) continue; const d = Math.hypot(o.x - c.x, o.z - c.z); if (d < bd) { bd = d; best = o; } } return best; }
+function faceTo(c, x, z) { const want = Math.atan2(x - c.x, z - c.z); let d = want - c.yaw; while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2; c.yaw += d * 0.12; return Math.abs(d); }
+function greetUpdate(c, dt) {
+  const f = c.friend; if (!f || f.dying) { c.actEnd = 0; return; }
+  const dist = Math.hypot(f.x - c.x, f.z - c.z), reach = 1.6 + (c.size[1] + f.size[1]) * 0.45;
+  if (!c.met) { if (dist > reach) { c.tx = f.x; c.tz = f.z; c.speedMul = 1.6; moveTo(c, dt, reach); } else { c.met = true; c.metT = c.actT; setAct(f, "greeted"); f.friend = c; } return; }
+  const t = c.actT - c.metT; faceTo(c, f.x, f.z); c.poseT.headPitch = t > 0.4 && t < 2.4 ? 0.35 + Math.sin(t * 5) * 0.2 : 0; c.poseT.tailAmp = 0.9;
+  if (t > 0.6 && !c.heartDone) { c.heartDone = true; const m = new THREE.Vector3((c.x + f.x) / 2, 2.4, (c.z + f.z) / 2); emit("heart", m, 1); setTimeout(() => emit("heart", m.clone().add(new THREE.Vector3(0.3, 0.2, 0)), 1), 250); }
+  if (t > 3.2) c.actEnd = 0;
+}
+function setAct(c, name) { const a = ACTIONS[name]; if (!a || c.dying) return; c.act = name; c.actT = 0; c.actEnd = a.dur[0] + Math.random() * (a.dur[1] - a.dur[0]); c.speedMul = 1; c.met = false; c.heartDone = false; for (const k in c) if (k[0] === "_") delete c[k]; if (a.start) a.start(c); }
+function pickAuto(c) {
+  if (Math.random() < 0.18) { const f = nearest(c); if (f && Math.hypot(f.x - c.x, f.z - c.z) < 7 && ["walk", "look", "eat"].includes(f.act)) { setAct(c, "greet"); c.friend = f; return; } }
+  let tot = 0; for (const [n, a] of AUTO) if (n !== c.act) tot += a.auto; let r = Math.random() * tot; for (const [n, a] of AUTO) { if (n === c.act) continue; r -= a.auto; if (r <= 0) { setAct(c, n); return; } } setAct(c, "walk");
+}
+
+// ================================================================ 걷는 범위: 화면에 보이는 땅 안쪽만
+const chars = [];
+let viewCheck = () => true; // app 쪽에서 화면 구성에 맞게 바꾼다
+function inPlay(x, z) { if (z < -8.4) return false; for (const [bx, bz, br] of blocked) if (Math.hypot(x - bx, z - bz) < br + 0.5) return false; return viewCheck(x, z); }
+function samplePlay(near, minD) { for (let i = 0; i < 60; i++) { const x = near ? near.x + (Math.random() - 0.5) * 16 : (Math.random() - 0.5) * 80, z = near ? near.z + (Math.random() - 0.5) * 10 : -8 + Math.random() * 22; if (minD && near && Math.hypot(x - near.x, z - near.z) < minD) continue; if (inPlay(x, z)) return [x, z]; } return null; }
+function newTarget(c, minD) { const p = samplePlay(c, minD || 2) || samplePlay(null); if (p) { c.tx = p[0]; c.tz = p[1]; } }
+function moveTo(c, dt, stopAt) {
+  if (c.y > 0.3) return; const dx = c.tx - c.x, dz = c.tz - c.z, dist = Math.hypot(dx, dz);
+  if (dist < (stopAt || 0.3)) { if (!stopAt) newTarget(c); return; }
+  const turn = faceTo(c, c.tx, c.tz); if (turn > 1.0) { c.moving = 0.3; return; }
+  const sp = c.speed * c.speedMul * dt, nx = c.x + Math.sin(c.yaw) * sp, nz = c.z + Math.cos(c.yaw) * sp;
+  if (!inPlay(nx, nz)) { newTarget(c); return; }
+  c.x = nx; c.z = nz; c.moving = c.speedMul;
+}
+
+  // ---------------------------------------------------------------- 색칠: 채우기와 붓
+  const pc = $("pc"), pctx = pc.getContext("2d");
+  const layer = document.createElement("canvas"); layer.width = AW; layer.height = AH; const lctx = layer.getContext("2d");
+  const lines = document.createElement("canvas"); lines.width = AW; lines.height = AH;
+  const PALETTE = ["#E4572E", "#F28C28", "#FFC83D", "#5FAE57", "#3E8FB0", "#2F5D8A", "#B57EDC", "#F7B6C2", "#D9A066", "#8A5A2B", "#3B3B3B", "#FFFFFF"];
+  let color = PALETTE[0], kind = "cow", tool = "fill", isLine = null, outside = null, stroke = null;
+  function redraw() { pctx.globalCompositeOperation = "source-over"; pctx.fillStyle = "#fff"; pctx.fillRect(0, 0, AW, AH); pctx.drawImage(layer, 0, 0); pctx.globalCompositeOperation = "multiply"; pctx.drawImage(lines, 0, 0); pctx.globalCompositeOperation = "source-over"; }
+  function pick(k, keep) {
+    kind = k; const x = lines.getContext("2d"); x.clearRect(0, 0, AW, AH); TPL.drawTemplate(x, k);
+    const d = x.getImageData(0, 0, AW, AH).data; isLine = new Uint8Array(AW * AH); for (let i = 0; i < AW * AH; i++) isLine[i] = d[i * 4 + 3] > 40 && d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] < 330 ? 1 : 0;
+    outside = new Uint8Array(AW * AH); { const st = [0]; outside[0] = 1; while (st.length) { const i = st.pop(), px = i % AW; if (px > 0 && !outside[i - 1] && !isLine[i - 1]) { outside[i - 1] = 1; st.push(i - 1); } if (px < AW - 1 && !outside[i + 1] && !isLine[i + 1]) { outside[i + 1] = 1; st.push(i + 1); } if (i >= AW && !outside[i - AW] && !isLine[i - AW]) { outside[i - AW] = 1; st.push(i - AW); } if (i < AW * (AH - 1) && !outside[i + AW] && !isLine[i + AW]) { outside[i + AW] = 1; st.push(i + AW); } } }
+    if (!keep) lctx.clearRect(0, 0, AW, AH); redraw();
+    document.querySelectorAll("#kinds button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.k === k)));
+  }
+  const at = (e) => { const r = pc.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * AW, ((e.clientY - r.top) / r.height) * AH]; };
+  function fillAt(x, y) {
+    x |= 0; y |= 0; if (x < 0 || y < 0 || x >= AW || y >= AH) return;
+    let seed = y * AW + x; if (isLine[seed]) return; if (outside[seed]) { toast("그림 안쪽을 눌러 주세요"); return; }
+    const reg = new Uint8Array(AW * AH), st = [seed]; reg[seed] = 1;
+    while (st.length) { const i = st.pop(), px = i % AW; if (px > 0 && !reg[i - 1] && !isLine[i - 1]) { reg[i - 1] = 1; st.push(i - 1); } if (px < AW - 1 && !reg[i + 1] && !isLine[i + 1]) { reg[i + 1] = 1; st.push(i + 1); } if (i >= AW && !reg[i - AW] && !isLine[i - AW]) { reg[i - AW] = 1; st.push(i - AW); } if (i < AW * (AH - 1) && !reg[i + AW] && !isLine[i + AW]) { reg[i + AW] = 1; st.push(i + AW); } }
+    const im = lctx.getImageData(0, 0, AW, AH), d = im.data, rr = parseInt(color.slice(1, 3), 16), g2 = parseInt(color.slice(3, 5), 16), bb = parseInt(color.slice(5, 7), 16);
+    for (let yy = 1; yy < AH - 1; yy++) for (let xx = 1; xx < AW - 1; xx++) { const i = yy * AW + xx; if (!(reg[i] || (isLine[i] && (reg[i - 1] || reg[i + 1] || reg[i - AW] || reg[i + AW])))) continue; d[i * 4] = rr; d[i * 4 + 1] = g2; d[i * 4 + 2] = bb; d[i * 4 + 3] = 255; }
+    lctx.putImageData(im, 0, 0); redraw();
+  }
+  pc.addEventListener("pointerdown", (e) => { const [x, y] = at(e); if (tool === "fill") { fillAt(x, y); return; } stroke = [x, y]; pc.setPointerCapture(e.pointerId); lctx.fillStyle = color; lctx.beginPath(); lctx.arc(x, y, 9, 0, 7); lctx.fill(); redraw(); });
+  pc.addEventListener("pointermove", (e) => { if (!stroke) return; const [x, y] = at(e); lctx.strokeStyle = color; lctx.lineWidth = 18; lctx.lineCap = "round"; lctx.beginPath(); lctx.moveTo(stroke[0], stroke[1]); lctx.lineTo(x, y); lctx.stroke(); stroke = [x, y]; redraw(); });
+  const endStroke = () => (stroke = null); pc.addEventListener("pointerup", endStroke); pc.addEventListener("pointercancel", endStroke);
+  const sw = $("swatches");
+  PALETTE.forEach((p, i) => { const b = document.createElement("button"); b.type = "button"; b.className = "swatch"; b.style.background = p; b.setAttribute("aria-label", "색 " + (i + 1)); b.setAttribute("aria-pressed", String(i === 0)); b.addEventListener("click", () => { color = p; sw.querySelectorAll(".swatch").forEach((s) => s.setAttribute("aria-pressed", String(s === b))); }); sw.appendChild(b); });
+  $("kinds").addEventListener("click", (e) => { const b = e.target.closest("button[data-k]"); if (b) pick(b.dataset.k); });
+  $("tools").addEventListener("click", (e) => { const b = e.target.closest("button[data-t]"); if (!b) return; tool = b.dataset.t; document.querySelectorAll("#tools button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); });
+  const paint = $("paint");
+  new MutationObserver(() => document.body.classList.toggle("painting", !paint.hidden)).observe(paint, { attributes: true, attributeFilter: ["hidden"] });
+  $("openPaint").addEventListener("click", () => { paint.hidden = !paint.hidden; if (!paint.hidden && !isLine) pick(kind); });
+  $("paintClose").addEventListener("click", () => (paint.hidden = true));
+  $("paintReset").addEventListener("click", () => { lctx.clearRect(0, 0, AW, AH); redraw(); });
+  $("paintSend").addEventListener("click", () => { redraw(); spawn(kind, pc, { intro: true }); toast(KO[kind] + "가 농장에 도착했습니다"); if (window.innerWidth <= 760) paint.hidden = true; });
+
+  // ---------------------------------------------------------------- 사진 올리기: 모서리 표식 네 개로 도안을 반듯하게 편다
+  function solve8(A, b) { const n = 8; for (let i = 0; i < n; i++) { let p = i; for (let r = i + 1; r < n; r++) if (Math.abs(A[r][i]) > Math.abs(A[p][i])) p = r; if (Math.abs(A[p][i]) < 1e-9) return null; [A[i], A[p]] = [A[p], A[i]]; [b[i], b[p]] = [b[p], b[i]]; for (let r = i + 1; r < n; r++) { const f = A[r][i] / A[i][i]; for (let c = i; c < n; c++) A[r][c] -= f * A[i][c]; b[r] -= f * b[i]; } } const x = new Array(n); for (let i = n - 1; i >= 0; i--) { let s = b[i]; for (let c = i + 1; c < n; c++) s -= A[i][c] * x[c]; x[i] = s / A[i][i]; } return x; }
+  function rectify(img) {
+    const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = Math.min(1, 1400 / Math.max(iw, ih)), W = Math.round(iw * k), H = Math.round(ih * k);
+    const src = document.createElement("canvas"); src.width = W; src.height = H; const sx = src.getContext("2d"); sx.drawImage(img, 0, 0, W, H); const sp = sx.getImageData(0, 0, W, H).data;
+    const ds = Math.max(1, Math.round(W / 700)), w = Math.floor(W / ds), h = Math.floor(H / ds), N = w * h, lum = new Float32Array(N);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = ((y * ds) * W + x * ds) * 4; lum[y * w + x] = 0.299 * sp[i] + 0.587 * sp[i + 1] + 0.114 * sp[i + 2]; }
+    const sorted = Array.from(lum).sort((a, b) => a - b), bright = sorted[Math.floor(N * 0.8)], thr = Math.min(120, bright * 0.5);
+    const lab = new Int32Array(N), cand = [], st = [];
+    for (let s = 0; s < N; s++) { if (lab[s] || lum[s] >= thr) continue; let area = 0, x0 = w, y0 = h, x1 = 0, y1 = 0, cx = 0, cy = 0; lab[s] = 1; st.push(s);
+      while (st.length) { const i = st.pop(), x = i % w, y = (i / w) | 0; area++; cx += x; cy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        if (x > 0 && !lab[i - 1] && lum[i - 1] < thr) { lab[i - 1] = 1; st.push(i - 1); } if (x < w - 1 && !lab[i + 1] && lum[i + 1] < thr) { lab[i + 1] = 1; st.push(i + 1); } if (i >= w && !lab[i - w] && lum[i - w] < thr) { lab[i - w] = 1; st.push(i - w); } if (i < N - w && !lab[i + w] && lum[i + w] < thr) { lab[i + w] = 1; st.push(i + w); } }
+      const bw = x1 - x0 + 1, bh = y1 - y0 + 1, fill = area / (bw * bh);
+      if (bw >= w * 0.012 && bw <= w * 0.07 && bh >= w * 0.012 && bh <= w * 0.07 && bw / bh > 0.6 && bw / bh < 1.67 && fill > 0.45 && fill < 0.98) cand.push({ x: (cx / area) * ds, y: (cy / area) * ds });
+    }
+    if (cand.length < 4) return null;
+    const corners = [[0, 0], [W, 0], [0, H], [W, H]].map(([px, py]) => cand.reduce((a, c) => (Math.hypot(c.x - px, c.y - py) < Math.hypot(a.x - px, a.y - py) ? c : a)));
+    if (new Set(corners).size < 4) return null;
+    const quad = Math.abs((corners[1].x - corners[0].x) * (corners[2].y - corners[0].y) - (corners[2].x - corners[0].x) * (corners[1].y - corners[0].y)); if (quad < W * H * 0.12) return null;
+    const M = TPL.MARKS, A = [], b = [];   // 도안 좌표 → 사진 좌표
+    for (let i = 0; i < 4; i++) { const [u, v] = M[i], p = corners[i]; A.push([u, v, 1, 0, 0, 0, -p.x * u, -p.x * v]); b.push(p.x); A.push([0, 0, 0, u, v, 1, -p.y * u, -p.y * v]); b.push(p.y); }
+    const hm = solve8(A, b); if (!hm) return null;
+    const out = document.createElement("canvas"); out.width = AW; out.height = AH; const ox = out.getContext("2d"), od = ox.createImageData(AW, AH), o = od.data;
+    for (let y = 0; y < AH; y++) for (let x = 0; x < AW; x++) { const u = x + TPL.OFF, v = y + TPL.OFF, den = hm[6] * u + hm[7] * v + 1, px = Math.round((hm[0] * u + hm[1] * v + hm[2]) / den), py = Math.round((hm[3] * u + hm[4] * v + hm[5]) / den), i = (y * AW + x) * 4;
+      if (px < 0 || py < 0 || px >= W || py >= H) { o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = 255; continue; } const j = (py * W + px) * 4; o[i] = sp[j]; o[i + 1] = sp[j + 1]; o[i + 2] = sp[j + 2]; o[i + 3] = 255; }
+    // 종이가 누렇거나 어둡게 찍혔으면 밝기를 종이 흰색에 맞춘다.
+    const hist = [[], [], []]; for (let i = 0; i < AW * AH; i += 37) for (let c = 0; c < 3; c++) hist[c].push(o[i * 4 + c]);
+    const gain = hist.map((a) => 250 / Math.max(60, a.sort((p, q) => p - q)[Math.floor(a.length * 0.9)]));
+    for (let i = 0; i < AW * AH; i++) for (let c = 0; c < 3; c++) o[i * 4 + c] = Math.min(255, o[i * 4 + c] * gain[c]);
+    ox.putImageData(od, 0, 0); return out;
+  }
+  const loadImg = (url) => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+  // 펴진 도안에서 어떤 동물 도안인지 알아낸다: 각 동물 도안의 테두리 선 자리가 실제로 어두운지 본다.
+  function detectKind(flat) {
+    const d = flat.getContext("2d").getImageData(0, 0, AW, AH).data, lum = (x, y) => { x = Math.max(0, Math.min(AW - 1, Math.round(x))); y = Math.max(0, Math.min(AH - 1, Math.round(y))); const i = (y * AW + x) * 4; return 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; };
+    let best = kind, bs = -9;
+    for (const k of Object.keys(TPL.SHAPES)) { const P = TPL.layout(k).px; let on = 0, off = 0, n = 0;
+      for (const r of Object.values(P)) { const edges = [[r.x, r.y, r.x + r.w, r.y, 0, 1], [r.x, r.y + r.h, r.x + r.w, r.y + r.h, 0, -1], [r.x, r.y, r.x, r.y + r.h, 1, 0], [r.x + r.w, r.y, r.x + r.w, r.y + r.h, -1, 0]];
+        for (const [x0, y0, x1, y1, nx, ny] of edges) { const L = Math.hypot(x1 - x0, y1 - y0); for (let t = 8; t < L - 8; t += 8) { const x = x0 + (x1 - x0) * t / L, y = y0 + (y1 - y0) * t / L; on += lum(x, y) < 110 ? 1 : 0; off += lum(x + nx * 14, y + ny * 14) < 110 ? 1 : 0; n++; } } }
+      const sc = (on - off) / Math.max(1, n); if (sc > bs) { bs = sc; best = k; } }
+    return best;
+  }
+  function addPhoto(im) { const flat = rectify(im); if (!flat) return null; const k = detectKind(flat); if (k !== kind) pick(k); return spawn(k, flat, { intro: true }); }
+  $("file").addEventListener("change", (e) => {
+    const f = e.target.files && e.target.files[0]; if (!f) return; toast("도안의 표식을 찾는 중입니다");
+    const fr = new FileReader(); fr.onerror = () => toast("사진을 읽지 못했습니다. 다른 사진으로 시도해 주세요.", true);
+    fr.onload = () => loadImg(fr.result).then((im) => { if (addPhoto(im)) toast(KO[kind] + "가 농장에 도착했습니다"); else toast("모서리 표식 네 개를 찾지 못했습니다. 도안 전체가 보이게 밝은 곳에서 찍어 주세요.", true); }).catch(() => toast("이 파일은 열 수 없습니다. 사진 파일을 올려 주세요.", true));
+    fr.readAsDataURL(f); e.target.value = "";
+  });
+
+// ================================================================ 동물 만들기와 움직임
+const POSE0 = { sit: 0, lie: 0, graze: 0, eyes: 1, headYaw: 0, headPitch: 0, headRoll: 0, tailAmp: 0.25, tailSpd: 3, lean: 0, ears: 0 };
+const maxChars = () => (mode === "wall4" ? 22 : 13);
+function spawn(kind, texCanvas, opts) {
+  opts = opts || {};
+  const snap = document.createElement("canvas"); snap.width = AW; snap.height = AH; snap.getContext("2d").drawImage(texCanvas, 0, 0, AW, AH);
+  const tex = new THREE.CanvasTexture(snap); tex.encoding = THREE.sRGBEncoding; tex.anisotropy = 8;
+  const a = makeAnimal(kind, tex), p = opts.at || samplePlay(null) || [0, 2];
+  const c = Object.assign(a, { x: p[0], z: p[1], y: 0, vy: 0, yaw: opts.yaw !== undefined ? opts.yaw : (Math.random() - 0.5) * 2.4, tx: p[0], tz: p[1], speed: 1.0 + Math.random() * 0.45, speedMul: 1, ph: Math.random() * 6, walkPh: 0, sq: 0, dying: 0, gait: 0, moving: 0, spin: 0, spawnT: opts.intro ? 0 : 1, blinkT: 1 + Math.random() * 4, pose: Object.assign({}, POSE0), poseT: Object.assign({}, POSE0), act: "walk", actT: 0, actEnd: 1 });
+  c.root.traverse((o) => (o.userData.c = c)); scene.add(c.root); chars.push(c);
+  if (opts.intro) { beam(c.x, c.z); emit("spark", new THREE.Vector3(c.x, 1.0, c.z), LOW ? 16 : 30); c.introWait = 1.0; setAct(c, "look"); c.actEnd = 1.3; }
+  else setAct(c, opts.act || AUTO[(Math.random() * AUTO.length) | 0][0]);
+  const alive = chars.filter((k) => !k.dying); if (alive.length > maxChars()) { const old = alive.find((k) => k !== c && k !== selected); if (old) old.dying = 0.001; }
+  return c;
+}
+function retire(c) { scene.remove(c.root); scene.remove(c.shadow); c.root.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); c.shadow.material.dispose(); c.mat.dispose(); c.tex.dispose(); chars.splice(chars.indexOf(c), 1); if (selected === c) select(null); }
+const easeBack = (t) => { const s = 1.6; t -= 1; return t * t * ((s + 1) * t + s) + 1; };
+function stepChars(dt, t) {
+  for (const c of chars.slice()) {
+    const S = SHAPES[c.kind], lh = S.leg[1];
+    if (c.dying) { c.dying += dt * 1.6; const s = Math.max(0, 1 - c.dying); c.root.scale.setScalar(S.scale * s); c.shadow.material.opacity = s; if (s <= 0) retire(c); continue; }
+    if (c.spawnT < 1) c.spawnT = Math.min(1, c.spawnT + dt / 0.9);
+    Object.assign(c.poseT, POSE0); c.moving = 0; c.actT += dt;
+    const A = ACTIONS[c.act]; if (A && A.update) A.update(c, dt);
+    if (c.actT >= c.actEnd) { if (c.introWait) { c.introWait = 0; setAct(c, "happy"); } else pickAuto(c); }
+    for (const o of chars) { if (o === c || o.dying) continue; const dx = c.x - o.x, dz = c.z - o.z, d = Math.hypot(dx, dz), min = 0.55 + (c.size[1] + o.size[1]) * 0.42; if (d < min && d > 1e-4) { const push = (min - d) * Math.min(1, dt * 3), nx = c.x + (dx / d) * push, nz = c.z + (dz / d) * push; if (inPlay(nx, nz)) { c.x = nx; c.z = nz; } } }
+    if (c.y > 0 || c.vy !== 0) { c.vy -= 16 * dt; c.y += c.vy * dt; if (c.y <= 0) { c.y = 0; c.sq = Math.min(0.25, Math.abs(c.vy) * 0.03); c.vy = 0; } }
+    c.sq *= Math.max(0, 1 - dt * 7);
+    c.blinkT -= dt; let blink = 1; if (c.blinkT < 0) { blink = 0.08; if (c.blinkT < -0.13) c.blinkT = 2.5 + Math.random() * 3.5; }
+    const P = c.pose, kk = Math.min(1, dt * 4.5); for (const key in P) P[key] += (c.poseT[key] - P[key]) * kk;
+    c.gait += ((c.moving > 0 ? 1 : 0) - c.gait) * Math.min(1, dt * 8);
+    const run = clamp((c.moving - 1) / 1.6, 0, 1); c.walkPh += dt * (7 + 6 * run) * (c.gait > 0.02 ? 1 : 0);
+    const still = (1 - P.sit) * (1 - P.lie), sw = Math.sin(c.walkPh) * (0.55 + 0.3 * run) * c.gait * still, air = c.y > 0.1 ? 0.5 : 0;
+    // 다리: 걸음 + 앉기(뒷다리 접기) + 눕기(앞다리 앞으로, 뒷다리 뒤로)
+    const fB = 0.55 * P.sit - 1.35 * P.lie, bB = -1.25 * P.sit + 1.35 * P.lie;
+    c.legs[0].rotation.x = sw - air + fB; c.legs[3].rotation.x = sw + air + bB; c.legs[1].rotation.x = -sw - air + fB; c.legs[2].rotation.x = -sw + air + bB;
+    c.hip.rotation.x = -0.55 * P.sit + 0.1 * P.graze; c.hip.rotation.z = P.lean + Math.sin(c.walkPh) * 0.03 * c.gait;
+    c.hip.position.y = lh - lh * 0.62 * P.sit - lh * 0.86 * P.lie + Math.abs(Math.sin(c.walkPh)) * (0.05 + 0.07 * run) * c.gait + Math.sin(t * 2 + c.ph) * 0.01;
+    c.neck.rotation.x = P.headPitch + 0.95 * P.graze + 0.4 * P.sit; c.neck.rotation.y = P.headYaw + (1 - c.gait) * Math.sin(t * 0.5 + c.ph * 2) * 0.12 * still; c.neck.rotation.z = P.headRoll;
+    const dog = c.kind === "dog"; c.tail.rotation.x = c.tailRest - 0.25 * P.tailAmp * (dog ? 1 : 0.4); c.tail.rotation.z = Math.sin(t * P.tailSpd * (dog ? 2.2 : 1) + c.ph) * P.tailAmp * (dog ? 1.1 : 0.7);
+    if (c.kind !== "pig") c.ears.forEach((e, i) => (e.rotation.z = (i ? 1 : -1) * (Math.abs(Math.sin(t * 1.3 + c.ph)) * 0.12 + P.ears * 0.2 * Math.sin(t * 16))));
+    c.eyes.children.forEach((e) => (e.scale.y = Math.max(0.06, P.eyes * blink)));
+    const gy = hill(c.x, c.z), pop = c.spawnT < 1 ? Math.max(0.001, easeBack(c.spawnT)) : 1;
+    c.root.position.set(c.x, gy + c.y, c.z); c.root.rotation.y = c.yaw + c.spin;
+    c.root.scale.set(S.scale * pop * (1 + c.sq), S.scale * pop * (1 - c.sq), S.scale * pop * (1 + c.sq));
+    if (c.act !== "dance") c.spin *= Math.max(0, 1 - dt * 6); else c.spin %= Math.PI * 2;
+    const hk = 1 - Math.min(c.y, 3) / 4.5; c.shadow.position.set(c.x, gy + 0.03, c.z); c.shadow.rotation.z = c.yaw + c.spin; c.shadow.scale.set(c.size[0] * 1.9 * S.scale * pop * hk, c.size[1] * 1.7 * S.scale * pop * hk, 1); c.shadow.material.opacity = 0.8 * pop * hk;
+  }
+}
+
+// ================================================================ 고르기 표시
+let selected = null;
+const selRing = new THREE.Mesh(new THREE.RingGeometry(0.85, 1.0, 48), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.4, 1.9, 0.6), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); selRing.rotation.x = -Math.PI / 2; selRing.visible = false; scene.add(selRing);
+function select(c) { selected = c; selRing.visible = !!c; $("actLabel").textContent = c ? "동작 (고른 " + KO[c.kind] + ")" : "동작 (모두)"; }
+
+// ================================================================ 화면 구성: 화면 1개 / 빔 4대 가로 / 빔 4대 2×2
+let mode = ["single", "wall4", "grid4"].includes(params.get("mode")) ? params.get("mode") : "single";
+const kiosk = params.get("ui") === "0", showGuides = params.get("guides") !== "0";
+if (kiosk) document.body.classList.add("kiosk");
+const VIEW = { single: [34, 19.5, 0.2, 1.3, -1], portrait: [50, 26, 0.24, 1.4, -1.2], wall4: [15, 34, 0.13, 1.4, -1.5], grid4: [34, 20.5, 0.19, 1.3, -1] };
+const homeCam = new THREE.PerspectiveCamera(); let stage = { x: 0, y: 0, w: 1, h: 1 };
+const viewOf = () => (mode === "single" && stage.w / stage.h < 0.9 ? VIEW.portrait : VIEW[mode]);
+function placeCam(cm, az, el) { const [fov, dist, , ty, tz] = viewOf(); cm.fov = fov; cm.aspect = stage.w / stage.h; cm.near = 0.1; cm.far = 700; cm.position.set(Math.sin(az) * dist * Math.cos(el), ty + dist * Math.sin(el), tz + Math.cos(az) * dist * Math.cos(el)); cm.lookAt(0, ty, tz); cm.updateProjectionMatrix(); cm.updateMatrixWorld(); }
+const _v = new THREE.Vector3();
+viewCheck = (x, z) => {
+  const mx = mode === "wall4" ? 0.035 : 0.08, dockH = kiosk || mode !== "single" ? 0 : Math.min(0.5, (($("dock").offsetHeight || 80) / stage.h) * 2), mb = 0.05 + dockH, mt = 0.08, y = hill(x, z);
+  if (z > (mode === "wall4" ? 9 : 6.5)) return false;
+  for (const [dx, hy, dz] of [[-1.1, 0, 1.2], [1.1, 0, 1.2], [-1.1, 2.2, -1], [1.1, 2.2, -1]]) { _v.set(x + dx, y + hy, z + dz).project(homeCam); if (_v.x < -1 + mx || _v.x > 1 - mx) return false; if (hy === 0 && _v.y < -1 + mb) return false; if (hy > 0 && _v.y > 1 - mt) return false; }
+  return true;
+};
+function drawGuides() {
+  const g = $("guides"); g.innerHTML = ""; const on = mode !== "single" && showGuides; g.style.display = on ? "block" : "none"; if (!on) return;
+  Object.assign(g.style, { left: stage.x + "px", top: stage.y + "px", width: stage.w + "px", height: stage.h + "px" });
+  const cols = mode === "wall4" ? 4 : 2, rows = mode === "wall4" ? 1 : 2;
+  for (let i = 1; i < cols; i++) { const d = document.createElement("div"); d.className = "v"; d.style.left = (i / cols) * 100 + "%"; g.appendChild(d); }
+  for (let j = 1; j < rows; j++) { const d = document.createElement("div"); d.className = "h"; d.style.top = (j / rows) * 100 + "%"; g.appendChild(d); }
+  let n = 1; for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const d = document.createElement("div"); d.className = "lab"; d.textContent = "빔 " + n++; d.style.left = (i / cols) * 100 + "%"; d.style.top = (j / rows) * 100 + "%"; g.appendChild(d); }
+}
+
+// ================================================================ 후처리: 빛 번짐, 색감, 테두리 어둡게
+const GradeShader = { uniforms: { tDiffuse: { value: null }, uVig: { value: 0.3 }, uSat: { value: 1.18 }, uAspect: { value: 1.7 }, uTime: { value: 0 } },
+  vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+  fragmentShader: `uniform sampler2D tDiffuse; uniform float uVig, uSat, uAspect, uTime; varying vec2 vUv;
+  vec3 toSRGB(vec3 c){ c = max(c, 0.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+  void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(vec3(l), c, uSat);
+    vec2 q = (vUv - 0.5) * vec2(min(uAspect, 1.9), 1.0); c *= mix(1.0, smoothstep(1.05, 0.25, length(q)), uVig);
+    vec3 o = toSRGB(c); o += (fract(sin(dot(vUv * 1000.0 + uTime, vec2(12.9898, 78.233))) * 43758.5453) - 0.5) / 255.0; gl_FragColor = vec4(o, 1.0); }` };
+let composer = null, bloom = null, grade = null;
+try {
+  const opts = { format: THREE.RGBAFormat, type: GL2 ? THREE.HalfFloatType : THREE.UnsignedByteType };
+  let rt; if (GL2) { rt = new THREE.WebGLMultisampleRenderTarget(16, 16, opts); rt.samples = LOW ? 2 : 4; } else rt = new THREE.WebGLRenderTarget(16, 16, opts);
+  composer = new THREE.EffectComposer(renderer, rt); composer.setPixelRatio(renderer.getPixelRatio());
+  composer.addPass(new THREE.RenderPass(scene, camera));
+  bloom = new THREE.UnrealBloomPass(new THREE.Vector2(16, 16), 0.5, 0.55, 0.85); composer.addPass(bloom);
+  grade = new THREE.ShaderPass(GradeShader); composer.addPass(grade);
+} catch (e) { composer = null; }
+function layout() {
+  const W = window.innerWidth, H = window.innerHeight; let w = W, h = H;
+  if (mode !== "single") { const A = mode === "wall4" ? 64 / 9 : 16 / 9; if (W / H > A) { h = H; w = H * A; } else { w = W; h = W / A; } }
+  stage = { x: Math.round((W - w) / 2), y: Math.round((H - h) / 2), w: Math.round(w), h: Math.round(h) };
+  Object.assign(canvas.style, { left: stage.x + "px", top: stage.y + "px", width: stage.w + "px", height: stage.h + "px" });
+  renderer.setSize(stage.w, stage.h, false); if (composer) { composer.setSize(stage.w, stage.h); grade.uniforms.uAspect.value = stage.w / stage.h; }
+  placeCam(homeCam, 0, viewOf()[2]); cam.tAz = cam.az = 0; cam.tEl = cam.el = viewOf()[2];
+  document.body.classList.toggle("wall", mode !== "single"); drawGuides();
+}
+function setMode(m) {
+  mode = m; layout(); document.querySelectorAll("#modes button[data-m]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+  for (const c of chars) if (!c.dying && !inPlay(c.x, c.z)) { const p = samplePlay(null); if (p) { c.x = c.tx = p[0]; c.z = c.tz = p[1]; c.spawnT = 0.2; } }
+  const want = m === "wall4" ? 12 : 0, alive = chars.filter((c) => !c.dying).length; for (let i = alive; i < want; i++) { const [k, v] = PRESETS[i % PRESETS.length]; spawn(k, preset(k, v)); }
+  if (m !== "single" && window.innerWidth < 760 && window.innerHeight > window.innerWidth) toast("빔 여러 대 화면은 가로로 돌리거나 큰 화면에서 보면 잘 보입니다");
+}
+
+// ================================================================ 카메라 조작과 동물 누르기
+const cam = { az: 0, el: 0.2, tAz: 0, tEl: 0.2 }; let drag = null;
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+canvas.addEventListener("pointerdown", (e) => { drag = { x: e.clientX, y: e.clientY, az: cam.tAz, el: cam.tEl, moved: 0 }; canvas.setPointerCapture(e.pointerId); });
+canvas.addEventListener("pointermove", (e) => { if (!drag) return; const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.moved = Math.max(drag.moved, Math.abs(dx) + Math.abs(dy)); if (mode !== "single") return; cam.tAz = clamp(drag.az - dx * 0.003, -0.6, 0.6); cam.tEl = clamp(drag.el + dy * 0.002, 0.08, 0.5); });
+canvas.addEventListener("pointerup", (e) => {
+  if (drag && drag.moved < 8) { const r = canvas.getBoundingClientRect(); ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1); ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(chars.filter((c) => !c.dying).map((c) => c.root), true)[0], c = hit && hit.object.userData.c;
+    if (c) { select(c); if (c.y < 0.05) c.vy = 5; toast(KO[c.kind] + "를 골랐어요. 아래 동작 버튼을 눌러 보세요"); } else if (selected) select(null); }
+  drag = null; });
+canvas.addEventListener("pointercancel", () => (drag = null));
+window.addEventListener("resize", layout);
+
+// ================================================================ 버튼
+{
+  const box = $("actions");
+  for (const [name, a] of Object.entries(ACTIONS)) { if (!a.label) continue; const b = document.createElement("button"); b.type = "button"; b.textContent = a.label; b.dataset.a = name; box.appendChild(b); }
+  box.addEventListener("click", (e) => { const b = e.target.closest("button[data-a]"); if (!b) return; const list = selected ? [selected] : chars.filter((c) => !c.dying && c.spawnT >= 1); list.forEach((c, i) => setTimeout(() => setAct(c, b.dataset.a), selected ? 0 : i * 90)); });
+}
+function setSeason(k) { seasonKey = k; paintFlowers(); sunflowers.visible = k !== "winter"; document.querySelectorAll("#seasons button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.s === k))); }
+function setTime(k) { timeKey = k; envTimer = 0; envLeft = 3; document.querySelectorAll("#times button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.t === k))); }
+$("seasons").addEventListener("click", (e) => { const b = e.target.closest("button[data-s]"); if (b) setSeason(b.dataset.s); });
+$("times").addEventListener("click", (e) => { const b = e.target.closest("button[data-t]"); if (b) setTime(b.dataset.t); });
+$("modes").addEventListener("click", (e) => { const b = e.target.closest("button[data-m]"); if (b) setMode(b.dataset.m); });
+$("fs").addEventListener("click", () => { const d = document.documentElement; if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(() => toast("이 브라우저에서는 전체 화면을 쓸 수 없습니다", true)); });
+$("moreToggle").addEventListener("click", () => { const open = !document.body.classList.contains("more-open"); document.body.classList.toggle("more-open", open); $("moreToggle").setAttribute("aria-expanded", String(open)); });
+
+// ================================================================ 매 프레임
+let T = 0, envTimer = 0, envLeft = 2;
+function tick(dt, skipRender) {
+  T += dt; uTime.value = T; blendLook(Math.min(1, dt * 1.8));
+  scene.fog.color.copy(cur.fog); scene.fog.near = cur.fogN; scene.fog.far = cur.fogF;
+  hemi.color.copy(cur.hemiS); hemi.groundColor.copy(cur.ground).multiplyScalar(cur.hgk); hemi.intensity = cur.hemiI;
+  sun.color.copy(cur.sun); sun.intensity = cur.sunI; sun.position.copy(cur.sunDir).multiplyScalar(80); sun.target.position.set(0, 0, -2);
+  skyU.cloudAmt.value = cur.cloudAmt; skyU.stars.value = cur.stars; renderer.toneMappingExposure = cur.expo;
+  mtnMats.forEach((m) => m.color.copy(cur.mtn).lerp(cur.mtnFar, m.userData.far * 0.8));
+  leafMats.forEach((m, i) => m.color.copy(cur.leaves[i])); pineMat.color.copy(cur.pine); grassMat.color.copy(cur.grass); snowU.value = cur.snow;
+  lamps.forEach((l) => (l.intensity = cur.lamp * 1.3)); for (const c of chars) c.mat.emissiveIntensity = cur.glow; winMat.emissiveIntensity = cur.lamp * 1.8; lanternMeshes.forEach((m) => (m.material.emissiveIntensity = cur.lamp * 3.2)); window.__barnLamp.material.emissiveIntensity = cur.lamp * 3;
+  fireU.amt.value = cur.fire; fireU.scale.value = stage.h * renderer.getPixelRatio();
+  if (bloom) { bloom.strength = cur.bloomS; bloom.threshold = cur.bloomT; grade.uniforms.uVig.value = mode === "single" ? cur.vig : 0.06; grade.uniforms.uTime.value = T % 10; }
+  if (envLeft > 0) { envTimer -= dt; if (envTimer <= 0) { bakeEnv(); envTimer = 0.6; envLeft--; } }
+  // 계절 입자
+  const part = SEASONS[seasonKey].part; pMat.size = [0.17, 0.08, 0.22, 0.16][part]; pMat.color.copy(cur.pcol); pMat.opacity = part === 1 ? 0.75 : 0.95;
+  for (let i = 0; i < PN; i++) { let y = pPos[i * 3 + 1] - cur.fall * dt * (0.5 + (pSeed[i] % 1) * 0.7); if (y < 0) y += 14; if (y > 14) y -= 14; pPos[i * 3 + 1] = y; pPos[i * 3] += Math.sin(T * 1.1 + pSeed[i]) * dt * (part === 1 ? 0.2 : 0.7); pPos[i * 3 + 2] += Math.cos(T * 0.7 + pSeed[i]) * dt * 0.25; }
+  pGeo.attributes.position.needsUpdate = true;
+  blades.rotation.z -= dt * 0.55;
+  const bfOn = timeKey !== "night" && seasonKey !== "winter";
+  for (const b of butterflies) { b.g.visible = bfOn; if (!bfOn) continue; const a = T * 0.45 + b.ph, x = b.cx + Math.cos(a) * b.r, z = b.cz + Math.sin(a * 1.3) * b.r * 0.6; b.g.position.set(x, hill(x, z) + 0.7 + Math.sin(T * 1.7 + b.ph) * 0.35, z); b.g.rotation.y = -a + Math.PI; const f = Math.sin(T * 20 + b.ph) * 1.1; b.wings[0].rotation.y = f; b.wings[1].rotation.y = -f; }
+  for (const b of birds) { b.g.visible = timeKey !== "night"; b.x += b.sp * dt; if (b.x > 140) b.x = -140; b.g.position.set(b.x, b.y + Math.sin(T * 0.5 + b.ph) * 1.5, b.z); b.g.rotation.y = Math.PI / 2; const f = Math.sin(T * 7 + b.ph) * 0.6; b.ws[0].rotation.z = f; b.ws[1].rotation.z = -f; }
+  stepChars(dt, T); stepFx(dt); stepBeams(dt);
+  if (selected && !selected.dying) { selRing.position.set(selected.x, hill(selected.x, selected.z) + 0.05, selected.z); const s = (selected.size[1] * 0.75 + 0.3) * SHAPES[selected.kind].scale * (1 + Math.sin(T * 5) * 0.05); selRing.scale.set(s, s, s); }
+  const sway = reduceMotion || mode !== "single" ? 0 : Math.sin(T * 0.16) * 0.06;
+  cam.az += (cam.tAz - cam.az) * Math.min(1, dt * 5); cam.el += (cam.tEl - cam.el) * Math.min(1, dt * 5); placeCam(camera, cam.az + sway, cam.el);
+  if (!skipRender) render();
+}
+function render() { if (composer) composer.render(); else renderer.render(scene, camera); }
+let last = performance.now();
+function frame(now) { const dt = Math.min(0.05, (now - last) / 1000); last = now; tick(dt); requestAnimationFrame(frame); }
+
+// ================================================================ 시작
+const preset = (k, v) => { const c = document.createElement("canvas"); c.width = AW; c.height = AH; const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, AW, AH); TPL.drawPreset(x, k, v); x.globalCompositeOperation = "multiply"; const l = document.createElement("canvas"); l.width = AW; l.height = AH; TPL.drawTemplate(l.getContext("2d"), k); x.drawImage(l, 0, 0); return c; };
+const PRESETS = [["cow", 0], ["pig", 0], ["dog", 0], ["cow", 1], ["dog", 1], ["pig", 0]];
+layout(); setSeason(seasonKey); setTime(timeKey); blendLook(1);
+document.querySelectorAll("#modes button[data-m]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === mode)));
+PRESETS.forEach(([k, v]) => spawn(k, preset(k, v)));
+if (mode === "wall4") setMode("wall4");
+
+window.__v2 = { chars, spawn, tick, render, preset, setSeason, setTime, setMode, setAct, select, ACTIONS, rectify, detectKind, addPhoto, layout, camera, scene, getMode: () => mode };
+if (!window.__capture) requestAnimationFrame(frame);
+})();
+</script>
+</body></html>
